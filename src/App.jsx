@@ -621,7 +621,10 @@ export default function BudgetPlanner() {
     if (!loaded) return;
     const t = setTimeout(async () => {
       try {
-        const text = JSON.stringify(model, null, 2);
+        // must byte-match what the dev middleware stores (it normalizes to a
+        // trailing newline) — the adopt poll compares exact text against the
+        // file, and any mismatch makes it stomp in-memory edits every 3s
+        const text = JSON.stringify(model, null, 2) + "\n";
         if (text === lastSaved.current) return;
         const where = await store.save(text);
         lastSaved.current = text;
@@ -773,7 +776,7 @@ export default function BudgetPlanner() {
 
   /* import / export */
   function exportJson() {
-    const blob = new Blob([JSON.stringify(model, null, 2)], { type: "application/json" });
+    const blob = new Blob([JSON.stringify(model, null, 2) + "\n"], { type: "application/json" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
     a.download = "budget-scenario.json";

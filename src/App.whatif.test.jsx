@@ -1,24 +1,33 @@
 // @vitest-environment jsdom
-// UI smoke test: mounts the real app (default model), adds a What-if
-// scenario through the UI, and exercises the "applied" checkbox end to
-// end — render, tab switch, click, and survival of the autosave debounce.
-import { describe, it, expect, vi, beforeAll } from "vitest";
+// UI smoke test: mounts the real app, adds a What-if scenario through the
+// UI, and exercises the "applied" checkbox end to end — including the
+// file-sync focus race: the dev middleware normalizes saves to a trailing
+// newline, and if the app's lastSaved text doesn't byte-match the file,
+// the adopt poll (which also fires on window focus) stomps any edit
+// younger than the autosave debounce.
+import { describe, it, expect, beforeAll } from "vitest";
 import React, { act } from "react";
 import { createRoot } from "react-dom/client";
+
+let fileText = null; // emulated data/model.json, normalized like the middleware
+const putBodies = [];
 
 beforeAll(() => {
   global.IS_REACT_ACT_ENVIRONMENT = true;
   global.ResizeObserver = class { observe() {} unobserve() {} disconnect() {} };
   window.matchMedia = window.matchMedia || (() => ({ matches: false, addListener() {}, removeListener() {}, addEventListener() {}, removeEventListener() {} }));
-  global.fetch = vi.fn(async (url, opts = {}) => ({
-    ok: opts.method === "PUT", // no saved file yet; accept saves
-    headers: { get: (h) => (h === "x-model-store" ? "1" : null) },
-    text: async () => "",
-  }));
+  global.fetch = async (url, opts = {}) => {
+    if (opts.method === "PUT") {
+      putBodies.push(opts.body);
+      fileText = opts.body.endsWith("\n") ? opts.body : opts.body + "\n"; // vite.config.js behavior
+      return { ok: true, headers: { get: (h) => (h === "x-model-store" ? "1" : null) }, text: async () => "" };
+    }
+    return { ok: fileText !== null, headers: { get: (h) => (h === "x-model-store" ? "1" : null) }, text: async () => fileText ?? "" };
+  };
 });
 
 describe("What-if applied checkbox", () => {
-  it("toggles on click and stays checked through the autosave window", async () => {
+  it("survives the autosave debounce and a focus-triggered file sync", async () => {
     const { default: BudgetPlanner } = await import("./App.jsx");
     const div = document.createElement("div");
     document.body.appendChild(div);
@@ -30,22 +39,27 @@ describe("What-if applied checkbox", () => {
     await act(async () => { button("What-if").click(); });
     await act(async () => { button("+ Add a scenario").click(); });
 
+    // let the autosave land so the emulated file holds the pre-click model
+    await act(async () => { await new Promise((r) => setTimeout(r, 1100)); });
+    expect(fileText).not.toBeNull();
+
     const appliedBox = () => [...div.querySelectorAll("label")]
       .find((l) => l.textContent.trim() === "applied")
       ?.querySelector("input[type=checkbox]");
-    const box = appliedBox();
-    expect(box).toBeTruthy();
-    expect(box.checked).toBe(false);
+    expect(appliedBox().checked).toBe(false);
 
-    await act(async () => { box.click(); });
+    // the user's exact gesture: click the checkbox as the first click back
+    // into the window — focus fires the adopt check before autosave runs
+    await act(async () => { appliedBox().click(); });
+    await act(async () => { window.dispatchEvent(new Event("focus")); await new Promise((r) => setTimeout(r, 200)); });
     expect(appliedBox().checked).toBe(true);
     expect(button("What-if").textContent).toContain("(1 on)");
 
-    // survives the autosave debounce and any follow-on re-renders
+    // and through the debounce window + a re-render tick
     await act(async () => { await new Promise((r) => setTimeout(r, 1200)); });
     expect(appliedBox().checked).toBe(true);
 
-    await act(async () => { appliedBox().click(); });
-    expect(appliedBox().checked).toBe(false);
+    // every save must byte-match what the middleware stores
+    for (const body of putBodies) expect(body.endsWith("\n")).toBe(true);
   }, 30000);
 });
