@@ -82,15 +82,24 @@ export function valueAt(item, abs, startAbs) {
     const charged = cm >= 1 && cm <= 12 ? cm : 1;
     if ((abs % 12) + 1 !== charged) return 0;
   }
-  let v = num(item.amount);
+  const g = num(item.growth) / 100;
+  const grown = (val, from, to) => (g ? val * Math.pow(1 + g, Math.max(0, Math.floor((to - from) / 12))) : val);
   const cs = (item.changes || [])
     .filter((c) => ymToAbs(c.month) !== null)
     .sort((a, b) => ymToAbs(a.month) - ymToAbs(b.month));
-  // "set" (default) replaces the amount; "delta" adds to the value in effect
-  for (const c of cs) if (abs >= ymToAbs(c.month)) v = c.mode === "delta" ? v + num(c.amount) : num(c.amount);
-  const g = num(item.growth) / 100;
-  if (g) v *= Math.pow(1 + g, Math.max(0, Math.floor((abs - startAbs) / 12)));
-  return v;
+  // "set" (default) replaces the amount; "delta" adds to the value in effect.
+  // Growth anniversaries count from the month the value was last set: the
+  // base grows from the sim start, a changed value from its change month
+  // (a delta applies to the grown value and restarts the clock).
+  let v = num(item.amount);
+  let since = startAbs;
+  for (const c of cs) {
+    const cm = ymToAbs(c.month);
+    if (abs < cm) break;
+    v = c.mode === "delta" ? grown(v, since, cm) + num(c.amount) : num(c.amount);
+    since = cm;
+  }
+  return grown(v, since, abs);
 }
 
 const FALLBACK_ACCOUNT = {

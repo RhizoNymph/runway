@@ -84,6 +84,23 @@ describe("valueAt", () => {
     expect(valueAt(item, start + 12, start)).toBeCloseTo(110);
     expect(valueAt(item, start + 24, start)).toBeCloseTo(121);
   });
+  it("a set change compounds growth from its own month, not the sim start", () => {
+    const item = { amount: 1000, growth: 10, startMonth: "", endMonth: "", changes: [{ id: "c", month: "2027-02", amount: 2000 }] };
+    expect(valueAt(item, ymToAbs("2027-02"), start)).toBe(2000);        // exactly what was typed
+    expect(valueAt(item, ymToAbs("2028-01"), start)).toBe(2000);        // under a year since the change
+    expect(valueAt(item, ymToAbs("2028-02"), start)).toBeCloseTo(2200); // first anniversary of the change
+  });
+  it("a delta grows the value it produced from the delta month onward", () => {
+    const item = { amount: 100, growth: 10, startMonth: "", endMonth: "", changes: [{ id: "c", month: "2026-07", amount: 100, mode: "delta" }] };
+    expect(valueAt(item, ymToAbs("2026-07"), start)).toBe(200);         // base had no anniversary yet
+    expect(valueAt(item, ymToAbs("2027-06"), start)).toBe(200);
+    expect(valueAt(item, ymToAbs("2027-07"), start)).toBeCloseTo(220);
+  });
+  it("a delta lands on the grown value when the base already compounded", () => {
+    const item = { amount: 100, growth: 10, startMonth: "", endMonth: "", changes: [{ id: "c", month: "2027-03", amount: 50, mode: "delta" }] };
+    expect(valueAt(item, ymToAbs("2027-03"), start)).toBeCloseTo(160);  // 110 grown base + 50
+    expect(valueAt(item, ymToAbs("2028-03"), start)).toBeCloseTo(176);  // 160 × 1.1 a year after the delta
+  });
   it("a disabled item contributes nothing", () => {
     const item = { amount: 100, growth: 0, startMonth: "", endMonth: "", changes: [], disabled: true };
     expect(valueAt(item, start, start)).toBe(0);
