@@ -1,9 +1,10 @@
 /* Sensitivity analysis: sweep one or two model items' amounts across a
    range and, for every grid point, report the solver's max affordable
-   amount and the end net worth of the plan as scheduled. Pure — the
+   amount and the end net worth of the plan *at that max* — "if I take
+   the most this scenario allows, where do I land". Pure — the
    Sensitivity tab in src/App.jsx renders the charts. */
 
-import { simulate, num } from "./engine.js";
+import { num } from "./engine.js";
 import { solveMax } from "./solver.js";
 
 /* axis: { kind: "income" | "expense" | "onetime", itemId, min, max, steps } */
@@ -26,9 +27,10 @@ export function setItemAmount(model, axis, value) {
 }
 
 /* Grid run, b outer × a inner; cells[j * aValues.length + i] pairs with
-   (aValues[i], bValues[j]). maxRent is NaN where even $0 fails the solver's
-   constraints. */
-export function runSensitivity(model, { a, b = null, solve, rate }) {
+   (aValues[i], bValues[j]). Both outputs come from the same solve — `end`
+   is the ending net worth with the item at its solved maximum — and both
+   are NaN where even $0 fails the solver's constraints. */
+export function runSensitivity(model, { a, b = null, solve }) {
   const aValues = axisValues(a);
   const bValues = b ? axisValues(b) : [null];
   const cells = [];
@@ -37,11 +39,8 @@ export function runSensitivity(model, { a, b = null, solve, rate }) {
     for (const av of aValues) {
       const m = setItemAmount(mB, a, av);
       const s = solveMax(m, solve);
-      cells.push({
-        a: av, b: bv,
-        maxRent: s && !s.infeasible ? s.value : NaN,
-        end: simulate(m, num(rate)).endTotal,
-      });
+      const ok = s && !s.infeasible;
+      cells.push({ a: av, b: bv, maxRent: ok ? s.value : NaN, end: ok ? s.endTotal : NaN });
     }
   }
   return { aValues, bValues, cells };

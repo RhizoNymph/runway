@@ -806,7 +806,6 @@ export default function BudgetPlanner() {
             itemId: solverItem.id, fromMonth: solver.fromMonth, cashFloor: solver.cashFloor,
             endTarget: solver.endTarget, useEndTarget: solver.useEndTarget, rate,
           },
-          rate,
         });
         setSensResult({ res, aName: sensItemName(sens.a), bName: sens.b?.itemId ? sensItemName(sens.b) : null });
       } finally { setSensBusy(false); }
@@ -826,7 +825,7 @@ export default function BudgetPlanner() {
       res.bValues.forEach((bv, j) => {
         const c = res.cells[j * res.aValues.length + i];
         row[`rent:${seriesKeys[j]}`] = Number.isNaN(c.maxRent) ? null : Math.round(c.maxRent);
-        row[`end:${seriesKeys[j]}`] = Math.round(c.end);
+        row[`end:${seriesKeys[j]}`] = Number.isNaN(c.end) ? null : Math.round(c.end);
       });
       return row;
     });
@@ -1483,9 +1482,11 @@ export default function BudgetPlanner() {
               {sensBusy && <span className="bp-hint">running the solver across the grid…</span>}
             </div>
             <div className="bp-note">
-              Each grid point reruns the rent solver (its floor and starting month) and the plan as scheduled
-              at the {baseScenario?.name || "headline"} rate, with applied what-ifs included. The sweep replaces
-              the item's base amount; scheduled changes still fold on top. Gaps mean even $0 fails the floor.
+              Each grid point reruns the rent solver (its floor and starting month) at the
+              {" "}{baseScenario?.name || "headline"} rate, with applied what-ifs included; both charts read
+              that solve — end net worth is where you land if you actually pay the solved max. The sweep
+              replaces the item's base amount; scheduled changes still fold on top. Gaps mean even $0 fails
+              the floor.
             </div>
 
             {sensCharts && <>
@@ -1512,7 +1513,7 @@ export default function BudgetPlanner() {
                 </ResponsiveContainer>
               </div>
 
-              <div className="bp-eyebrow" style={{ marginTop: 14 }}>End net worth vs {sensCharts.aName}</div>
+              <div className="bp-eyebrow" style={{ marginTop: 14 }}>End net worth at that max vs {sensCharts.aName}</div>
               <div style={{ width: "100%", height: 260 }}>
                 <ResponsiveContainer>
                   <LineChart data={sensCharts.data} margin={{ top: 8, right: 18, bottom: 4, left: 4 }}>

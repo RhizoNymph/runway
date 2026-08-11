@@ -4,8 +4,9 @@
 
 The Sensitivity tab: sweep the amount of one or two chosen items (any
 income, expense, or one-time line) across a range and chart, per grid
-point, the solver's max affordable amount and the end net worth of the
-plan as scheduled. Pure grid logic in `src/sensitivity.js`
+point, the solver's max affordable amount and the ending net worth of
+the plan *at that solved max* — "if I take the most this scenario
+allows, where do I land". Pure grid logic in `src/sensitivity.js`
 (`axisValues`, `setItemAmount`, `runSensitivity`); controls and the two
 Recharts line charts live in `BudgetPlanner` (src/App.jsx).
 
@@ -20,12 +21,13 @@ Recharts line charts live in `BudgetPlanner` (src/App.jsx).
 1. `model.sensitivity = { a, b }` — each axis `{ kind: "income" |
    "expense" | "onetime", itemId, min, max, steps }`; `b` optional.
    Picking an item defaults the range to 0…2× its current amount.
-2. `runSensitivity(model, { a, b, solve, rate })` sweeps the grid
+2. `runSensitivity(model, { a, b, solve })` sweeps the grid
    (`b` outer × `a` inner). Each cell replaces the items' **base
    amounts** via `setItemAmount` (scheduled changes still fold on top),
-   then runs `solveMax` with the solver panel's settings (max rent; NaN
-   when even $0 fails) and `simulate` at the headline rate (end net worth
-   of the plan as scheduled — not at the solved rent).
+   then runs `solveMax` with the solver panel's settings at the headline
+   rate. Both outputs read that one solve: `maxRent` is the solved value
+   and `end` is its `endTotal` — the net worth you finish with if you
+   actually pay the max. Both are NaN where even $0 is infeasible.
 3. The tab feeds the sweep the **effective** model, so applied what-if
    overlays are included.
 4. Two single-axis charts (never dual-axis): max rent vs A, and end net

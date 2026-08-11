@@ -49,14 +49,24 @@ describe("setItemAmount", () => {
 });
 
 describe("runSensitivity", () => {
-  it("one variable: max rent tracks income, end tracks the scheduled plan", () => {
+  it("one variable: max rent tracks income; end is what the max-rent plan keeps", () => {
     const r = runSensitivity(model(), { a: { kind: "income", itemId: "sal", min: 4000, max: 10000, steps: 3 }, solve, rate: 0 });
     expect(r.aValues).toEqual([4000, 7000, 10000]);
     expect(r.bValues).toEqual([null]);
     r.cells.forEach((c, i) => {
-      expect(c.maxRent).toBeCloseTo(r.aValues[i], 1);          // floor 0 → rent up to net income
-      expect(c.end).toBeCloseTo(12 * (r.aValues[i] - 2000), 1); // plan keeps rent 2000
+      expect(c.maxRent).toBeCloseTo(r.aValues[i], 1); // floor 0 → rent up to net income
+      expect(c.end).toBeCloseTo(0, 1);                // at max rent, the floor is all that's left
     });
+  });
+  it("end at max rent equals the floor when the last month binds", () => {
+    const m = model();
+    m.accounts[0].balance = 12000;
+    const r = runSensitivity(m, {
+      a: { kind: "income", itemId: "sal", min: 10000, max: 10000, steps: 2 },
+      solve: { ...solve, cashFloor: 5000 }, rate: 0,
+    });
+    expect(r.cells[0].maxRent).toBeCloseTo(10000 + (12000 - 5000) / 12, 1);
+    expect(r.cells[0].end).toBeCloseTo(5000, 1);
   });
   it("two variables: the second axis shifts both outputs cell by cell", () => {
     const r = runSensitivity(model(), {
@@ -67,14 +77,17 @@ describe("runSensitivity", () => {
     expect(r.bValues).toEqual([0, 1000]);
     const cell = (i, j) => r.cells[j * r.aValues.length + i];
     expect(cell(0, 0).maxRent).toBeCloseTo(5000, 1);
-    expect(cell(0, 1).maxRent).toBeCloseTo(4000, 1);           // 1000 of "Other" crowds rent out
-    expect(cell(1, 1).end).toBeCloseTo(12 * (10000 - 2000 - 1000), 1);
+    expect(cell(0, 1).maxRent).toBeCloseTo(4000, 1); // 1000 of "Other" crowds rent out
+    expect(cell(1, 1).end).toBeCloseTo(0, 1);        // max rent drains to the $0 floor
   });
-  it("marks infeasible cells with NaN max rent", () => {
+  it("marks infeasible cells with NaN in both outputs", () => {
     const r = runSensitivity(model(), {
       a: { kind: "income", itemId: "sal", min: 0, max: 1000, steps: 2 },
       solve: { ...solve, cashFloor: 1e9 }, rate: 0,
     });
-    r.cells.forEach((c) => expect(Number.isNaN(c.maxRent)).toBe(true));
+    r.cells.forEach((c) => {
+      expect(Number.isNaN(c.maxRent)).toBe(true);
+      expect(Number.isNaN(c.end)).toBe(true);
+    });
   });
 });
