@@ -95,6 +95,11 @@ Features Index:
     entry_points: [src/variants.js:applyVariant, src/variants.js:withApplied, src/variants.js:variantMetrics, "src/App.jsx (What-if tab)"]
     depends_on: [simulation_engine, line_items, rent_solver]
     doc: docs/features/what_if_variants.md
+  sensitivity_analysis:
+    description: Sweep one or two items' amounts over ranges and chart max affordable rent and end net worth per grid point (Sensitivity tab)
+    entry_points: [src/sensitivity.js:runSensitivity, "src/App.jsx (Sensitivity tab)"]
+    depends_on: [simulation_engine, rent_solver, what_if_variants]
+    doc: docs/features/sensitivity_analysis.md
   compare_cli:
     description: CLI diffing a variant model against data/model.json — impact at milestone/checkpoint months, lowest cash, end net worth
     entry_points: [scripts/compare.js, scripts/compare/core.js]
@@ -117,6 +122,8 @@ Features Index:
 | `src/solver.test.js` | Vitest unit tests for the solver |
 | `src/variants.js` | Pure what-if overlays: `applyVariant`, `variantMetrics` |
 | `src/variants.test.js` | Vitest unit tests for the what-if overlays |
+| `src/sensitivity.js` | Pure sensitivity sweeps: `runSensitivity` over item-amount grids |
+| `src/sensitivity.test.js` | Vitest unit tests for the sweeps |
 | `src/App.jsx` | UI + defaults + solver + persistence (`BudgetPlanner`) |
 | `src/main.jsx` | React 18 mount |
 | `index.html` | Vite entry |

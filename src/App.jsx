@@ -6,6 +6,7 @@ import {
 import { MON, num, ymToAbs, absToYm, absLabel, valueAt, oneTimeAmount, simulate } from "./engine.js";
 import { solveMax, trialItem } from "./solver.js";
 import { applyVariant, variantMetrics, withApplied } from "./variants.js";
+import { runSensitivity } from "./sensitivity.js";
 
 /* ── persistence ──
    Primary store is data/model.json on disk, via the dev server's
@@ -134,6 +135,7 @@ function makeDefaults() {
     ],
     solver: { itemId: null, fromMonth: "", cashFloor: 15000, endTarget: 0, useEndTarget: false },
     variants: [],
+    sensitivity: null,
   };
 }
 
@@ -774,6 +776,67 @@ export default function BudgetPlanner() {
     patch({ expenses: baked.expenses, variants: variantsList.filter((x) => x.id !== v.id) });
   };
 
+  /* ── sensitivity analysis: sweep one or two items' amounts ── */
+  const sens = model.sensitivity || {};
+  const [sensResult, setSensResult] = useState(null);
+  const [sensBusy, setSensBusy] = useState(false);
+  const sensLists = { income: incomes, expense: expenses, onetime: oneTimes };
+  const sensItemName = (axis) =>
+    (sensLists[axis?.kind] || []).find((x) => x.id === axis?.itemId)?.name || "(unnamed)";
+  const pickSensAxis = (which, encoded) => {
+    if (!encoded) { patch({ sensitivity: { ...sens, [which]: null } }); return; }
+    const [kind, itemId] = encoded.split(":");
+    const amt = num((sensLists[kind] || []).find((x) => x.id === itemId)?.amount);
+    const max = amt > 0 ? Math.ceil((amt * 2) / 500) * 500 : 5000;
+    patch({ sensitivity: { ...sens, [which]: { kind, itemId, min: 0, max, steps: which === "a" ? 9 : 4 } } });
+  };
+  const setSensAxis = (which, p) =>
+    patch({ sensitivity: { ...sens, [which]: { ...sens[which], ...p } } });
+
+  const runSens = () => {
+    if (!sens.a?.itemId || !solverItem) return;
+    setSensBusy(true);
+    setTimeout(() => { // let the busy note paint before the synchronous grid run
+      try {
+        const rate = num(baseScenario?.rate ?? 7);
+        const res = runSensitivity(effective, {
+          a: sens.a,
+          b: sens.b?.itemId ? { ...sens.b, steps: Math.max(2, Math.min(5, Math.round(num(sens.b.steps)) || 4)) } : null,
+          solve: {
+            itemId: solverItem.id, fromMonth: solver.fromMonth, cashFloor: solver.cashFloor,
+            endTarget: solver.endTarget, useEndTarget: solver.useEndTarget, rate,
+          },
+          rate,
+        });
+        setSensResult({ res, aName: sensItemName(sens.a), bName: sens.b?.itemId ? sensItemName(sens.b) : null });
+      } finally { setSensBusy(false); }
+    }, 30);
+  };
+
+  /* sequential ramp for the second variable (light → dark as it grows);
+     single-series charts use the app's fixed hues instead */
+  const SENS_RAMP = ["#C4DEDF", "#8FBDBF", "#5C9EA1", "#2F7C80", "#0B4F53"];
+  const sensCharts = useMemo(() => {
+    if (!sensResult) return null;
+    const { res, aName, bName } = sensResult;
+    const multi = res.bValues[0] !== null;
+    const seriesKeys = res.bValues.map((bv) => (multi ? money(bv) : "value"));
+    const data = res.aValues.map((av, i) => {
+      const row = { a: av };
+      res.bValues.forEach((bv, j) => {
+        const c = res.cells[j * res.aValues.length + i];
+        row[`rent:${seriesKeys[j]}`] = Number.isNaN(c.maxRent) ? null : Math.round(c.maxRent);
+        row[`end:${seriesKeys[j]}`] = Math.round(c.end);
+      });
+      return row;
+    });
+    const color = (j, mono) => (multi
+      ? SENS_RAMP[Math.round((j * (SENS_RAMP.length - 1)) / Math.max(1, res.bValues.length - 1))]
+      : mono);
+    const currentA = num((sensLists[sens.a?.kind] || []).find((x) => x.id === sens.a?.itemId)?.amount);
+    return { data, seriesKeys, aName, bName, multi, color, currentA };
+  }, [sensResult]);
+
   /* import / export */
   function exportJson() {
     const blob = new Blob([JSON.stringify(model, null, 2) + "\n"], { type: "application/json" });
@@ -1000,6 +1063,7 @@ export default function BudgetPlanner() {
           {[["expenses", "Expenses"], ["income", "Income"], ["onetime", "One-time"],
             ["accounts", "Accounts & 401(k)"],
             ["whatif", `What-if${variantsList.filter((v) => v.applied).length ? ` (${variantsList.filter((v) => v.applied).length} on)` : ""}`],
+            ["sense", "Sensitivity"],
             ["settings", "Taxes & scenarios"], ["table", "Year by year"]]
             .map(([k, l]) => (
               <button key={k} className="bp-tab" data-on={tab === k ? "1" : "0"} onClick={() => setTab(k)}>{l}</button>
@@ -1364,6 +1428,117 @@ export default function BudgetPlanner() {
                 + Add a scenario
               </button>
             </div>
+          </div>
+        )}
+
+        {tab === "sense" && (
+          <div className="bp-card" style={{ marginTop: 0, borderTop: "none" }}>
+            <div className="bp-eyebrow">Sensitivity — sweep one or two items and watch the outputs</div>
+            <div className="bp-fields">
+              <Field label="Vary">
+                <select value={sens.a ? `${sens.a.kind}:${sens.a.itemId}` : ""} onChange={(e) => pickSensAxis("a", e.target.value)}>
+                  <option value="">— pick an item —</option>
+                  <optgroup label="Income">
+                    {incomes.map((x) => <option key={x.id} value={`income:${x.id}`}>{x.name || "(unnamed)"}</option>)}
+                  </optgroup>
+                  <optgroup label="Expenses">
+                    {expenses.map((x) => <option key={x.id} value={`expense:${x.id}`}>{x.name || "(unnamed)"}</option>)}
+                  </optgroup>
+                  <optgroup label="One-time">
+                    {oneTimes.map((x) => <option key={x.id} value={`onetime:${x.id}`}>{x.name || "(unnamed)"}</option>)}
+                  </optgroup>
+                </select>
+              </Field>
+              {sens.a && <>
+                <Field label="From"><NumInput value={sens.a.min} step={500} onChange={(v) => setSensAxis("a", { min: v })} /></Field>
+                <Field label="To"><NumInput value={sens.a.max} step={500} onChange={(v) => setSensAxis("a", { max: v })} /></Field>
+                <Field label="Steps"><NumInput value={sens.a.steps} step={1} onChange={(v) => setSensAxis("a", { steps: v })} /></Field>
+              </>}
+            </div>
+            <div className="bp-fields" style={{ marginTop: 8 }}>
+              <Field label="And (optional)">
+                <select value={sens.b ? `${sens.b.kind}:${sens.b.itemId}` : ""} onChange={(e) => pickSensAxis("b", e.target.value)}>
+                  <option value="">— nothing —</option>
+                  <optgroup label="Income">
+                    {incomes.map((x) => <option key={x.id} value={`income:${x.id}`}>{x.name || "(unnamed)"}</option>)}
+                  </optgroup>
+                  <optgroup label="Expenses">
+                    {expenses.map((x) => <option key={x.id} value={`expense:${x.id}`}>{x.name || "(unnamed)"}</option>)}
+                  </optgroup>
+                  <optgroup label="One-time">
+                    {oneTimes.map((x) => <option key={x.id} value={`onetime:${x.id}`}>{x.name || "(unnamed)"}</option>)}
+                  </optgroup>
+                </select>
+              </Field>
+              {sens.b && <>
+                <Field label="From"><NumInput value={sens.b.min} step={500} onChange={(v) => setSensAxis("b", { min: v })} /></Field>
+                <Field label="To"><NumInput value={sens.b.max} step={500} onChange={(v) => setSensAxis("b", { max: v })} /></Field>
+                <Field label="Lines (2–5)"><NumInput value={sens.b.steps} step={1} onChange={(v) => setSensAxis("b", { steps: v })} /></Field>
+              </>}
+            </div>
+            <div className="bp-flex" style={{ marginTop: 12 }}>
+              <button className="bp-btn solid" disabled={!sens.a?.itemId || sensBusy} onClick={runSens}>
+                {sensBusy ? "Computing…" : "Run analysis"}
+              </button>
+              {sensBusy && <span className="bp-hint">running the solver across the grid…</span>}
+            </div>
+            <div className="bp-note">
+              Each grid point reruns the rent solver (its floor and starting month) and the plan as scheduled
+              at the {baseScenario?.name || "headline"} rate, with applied what-ifs included. The sweep replaces
+              the item's base amount; scheduled changes still fold on top. Gaps mean even $0 fails the floor.
+            </div>
+
+            {sensCharts && <>
+              <div className="bp-eyebrow" style={{ marginTop: 18 }}>Max {solverItem?.name || "rent"} vs {sensCharts.aName}</div>
+              <div style={{ width: "100%", height: 260 }}>
+                <ResponsiveContainer>
+                  <LineChart data={sensCharts.data} margin={{ top: 8, right: 18, bottom: 4, left: 4 }}>
+                    <CartesianGrid stroke="#E3E6DD" strokeDasharray="3 3" vertical={false} />
+                    <XAxis dataKey="a" type="number" domain={["dataMin", "dataMax"]} tickFormatter={moneyK}
+                      tickLine={false} stroke="#C7CDBF" tick={{ fontSize: 10, fontFamily: "ui-monospace, monospace", fill: "#6E7A72" }} />
+                    <YAxis tickFormatter={moneyK} width={54} tickLine={false} stroke="#C7CDBF"
+                      tick={{ fontSize: 10, fontFamily: "ui-monospace, monospace", fill: "#6E7A72" }} />
+                    <Tooltip contentStyle={tooltipStyle} formatter={(v) => money(v)}
+                      labelFormatter={(l) => `${sensCharts.aName}: ${money(l)}`} />
+                    {sensCharts.multi && <Legend wrapperStyle={{ fontSize: 11, fontFamily: "ui-monospace, monospace" }} />}
+                    {sensCharts.currentA > 0 && <ReferenceLine x={sensCharts.currentA} stroke="#8A94A6" strokeDasharray="4 4" />}
+                    {sensCharts.seriesKeys.map((k, j) => (
+                      <Line key={k} type="monotone" dataKey={`rent:${k}`}
+                        name={sensCharts.multi ? `${sensCharts.bName} ${k}` : `Max ${solverItem?.name || "rent"}`}
+                        stroke={sensCharts.color(j, "#0E7C86")} strokeWidth={2}
+                        dot={{ r: 2.5 }} activeDot={{ r: 5 }} isAnimationActive={false} connectNulls={false} />
+                    ))}
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+
+              <div className="bp-eyebrow" style={{ marginTop: 14 }}>End net worth vs {sensCharts.aName}</div>
+              <div style={{ width: "100%", height: 260 }}>
+                <ResponsiveContainer>
+                  <LineChart data={sensCharts.data} margin={{ top: 8, right: 18, bottom: 4, left: 4 }}>
+                    <CartesianGrid stroke="#E3E6DD" strokeDasharray="3 3" vertical={false} />
+                    <XAxis dataKey="a" type="number" domain={["dataMin", "dataMax"]} tickFormatter={moneyK}
+                      tickLine={false} stroke="#C7CDBF" tick={{ fontSize: 10, fontFamily: "ui-monospace, monospace", fill: "#6E7A72" }} />
+                    <YAxis tickFormatter={moneyK} width={54} tickLine={false} stroke="#C7CDBF"
+                      tick={{ fontSize: 10, fontFamily: "ui-monospace, monospace", fill: "#6E7A72" }} />
+                    <Tooltip contentStyle={tooltipStyle} formatter={(v) => money(v)}
+                      labelFormatter={(l) => `${sensCharts.aName}: ${money(l)}`} />
+                    {sensCharts.multi && <Legend wrapperStyle={{ fontSize: 11, fontFamily: "ui-monospace, monospace" }} />}
+                    {sensCharts.currentA > 0 && <ReferenceLine x={sensCharts.currentA} stroke="#8A94A6" strokeDasharray="4 4" />}
+                    {sensCharts.seriesKeys.map((k, j) => (
+                      <Line key={k} type="monotone" dataKey={`end:${k}`}
+                        name={sensCharts.multi ? `${sensCharts.bName} ${k}` : "End net worth"}
+                        stroke={sensCharts.color(j, "#2B4C9B")} strokeWidth={2}
+                        dot={{ r: 2.5 }} activeDot={{ r: 5 }} isAnimationActive={false} connectNulls={false} />
+                    ))}
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="bp-note">
+                Dashed gray line marks the item's current amount{sensCharts.multi ? "; darker lines are higher values of the second item" : ""}.
+                Results are from the last run — hit "Run analysis" after editing the plan.
+              </div>
+            </>}
           </div>
         )}
 

@@ -135,6 +135,12 @@ horizon — see docs/features/compare_cli.md. Only copy a variant over
                     "startMonth": "" // "" = variant/sim start
       } ] }
   ],
+  "sensitivity": {                 // Sensitivity tab axis config (results are
+    "a": { "kind": "income",       //   never saved); null/missing = unset.
+           "itemId": "<id>",       //   kind: income | expense | onetime
+           "min": 0, "max": 7000, "steps": 8 },
+    "b": null                      // optional second axis, same shape
+  },
   "solver": { "itemId": null, "fromMonth": "", "cashFloor": 15000,
               "endTarget": 0, "useEndTarget": false }
 }

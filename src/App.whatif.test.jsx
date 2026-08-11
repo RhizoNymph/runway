@@ -62,4 +62,30 @@ describe("What-if applied checkbox", () => {
     // every save must byte-match what the middleware stores
     for (const body of putBodies) expect(body.endsWith("\n")).toBe(true);
   }, 30000);
+
+  it("sensitivity tab runs a sweep and renders both chart sections", async () => {
+    const { default: BudgetPlanner } = await import("./App.jsx");
+    const div = document.createElement("div");
+    document.body.appendChild(div);
+    const root = createRoot(div);
+    await act(async () => { root.render(React.createElement(BudgetPlanner)); });
+    await act(async () => { await new Promise((r) => setTimeout(r, 50)); });
+
+    const button = (text) => [...div.querySelectorAll("button")].find((b) => b.textContent.trim().startsWith(text));
+    await act(async () => { button("Sensitivity").click(); });
+
+    const varySelect = [...div.querySelectorAll("select")]
+      .find((s) => [...s.querySelectorAll("option")].some((o) => o.value.startsWith("income:")));
+    const firstIncome = [...varySelect.querySelectorAll("option")].find((o) => o.value.startsWith("income:"));
+    await act(async () => {
+      varySelect.value = firstIncome.value;
+      varySelect.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    await act(async () => { button("Run analysis").click(); });
+    await act(async () => { await new Promise((r) => setTimeout(r, 3000)); });
+
+    const eyebrows = [...div.querySelectorAll(".bp-eyebrow")].map((e) => e.textContent);
+    expect(eyebrows.some((t) => t.startsWith("Max "))).toBe(true);
+    expect(eyebrows.some((t) => t.startsWith("End net worth"))).toBe(true);
+  }, 60000);
 });
