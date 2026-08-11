@@ -1183,6 +1183,12 @@ export default function BudgetPlanner() {
                           <span style={{ width: 128 }} title="Cap and backstop are dormant before this month; empty = from the beginning">
                             <MonthInput value={a.overflowStart || ""} onChange={(v) => upd({ overflowStart: v })} />
                           </span>
+                          <label style={{ display: "flex", gap: 4, alignItems: "center" }}
+                            title="A month that dips below the cap pulls money back from the overflow destination to refill it — without this, the backstop only rescues a balance about to go negative">
+                            <input type="checkbox" checked={!!a.refillToCap}
+                              onChange={(e) => upd({ refillToCap: e.target.checked })} />
+                            refill to cap
+                          </label>
                         </>}
                       </span>
                     )}

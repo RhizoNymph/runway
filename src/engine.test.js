@@ -444,6 +444,35 @@ describe("leftover overflow between accounts", () => {
     expect(r.rows[1].invest).toBe(5000);
   });
 
+  it("refillToCap tops the account back up to its cap, not just to zero", () => {
+    const m = model({}, {
+      expenses: [{ ...living, amount: 13000 }], // surplus −3000/mo
+      accounts: [
+        acct("a1", { primary: true, balance: 20000, capAmount: 20000, overflowTo: "a2", refillToCap: true }),
+        acct("a2", { type: "invest", balance: 10000 }),
+      ],
+    });
+    const r = simulate(m, 0);
+    expect(r.rows[0].cash).toBe(20000);  // dip to 17000 refilled from the brokerage
+    expect(r.rows[0].invest).toBe(7000);
+    expect(r.rows[2].invest).toBe(1000);
+    expect(r.rows[3].cash).toBe(18000);  // only 1000 left to pull
+    expect(r.rows[3].invest).toBe(0);
+  });
+  it("refillToCap walks the chain and stays dormant before overflowStart", () => {
+    const m = model({}, {
+      expenses: [{ ...living, amount: 13000 }], // surplus −3000/mo
+      accounts: [
+        acct("a1", { primary: true, balance: 5000, capAmount: 5000, overflowTo: "a2", refillToCap: true, overflowStart: "2026-02" }),
+        acct("a2", { capAmount: 1000, overflowTo: "a3", balance: 1000, refillToCap: true }),
+        acct("a3", { type: "invest", balance: 50000 }),
+      ],
+    });
+    const r = simulate(m, 0);
+    expect(r.rows[0].cash).toBe(3000);   // January: link dormant, no refill (5000 − 3000 + a2's 1000)
+    expect(r.rows[1].cash).toBe(6000);   // February: both refilled to their caps
+    expect(r.rows[1].invest).toBe(44000);
+  });
   it("stays negative when there is no overflow link to pull from", () => {
     const m = model({}, {
       expenses: [{ ...living, amount: 13000 }],

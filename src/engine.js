@@ -232,13 +232,16 @@ export function simulate(model, annualReturnPct) {
       if (!moved) break;
     }
 
-    // backstop: an account driven negative pulls back along its overflow
-    // chain — just enough to reach $0, never a proactive refill to the cap
+    // backstop: an account driven under its floor pulls back along its
+    // overflow chain. The floor is $0 by default — just enough to avoid
+    // going negative — or the cap itself when `refillToCap` is set, which
+    // keeps the account topped up ("self-healing") while the chain has money.
     for (let i = 0; i < accounts.length; i++) {
-      if (bal[i] >= 0) continue;
+      const want = accounts[i].refillToCap && linkOf(i) >= 0 ? num(accounts[i].capAmount) : 0;
+      if (bal[i] >= want) continue;
       const seen = new Set([i]);
-      for (let j = linkOf(i); bal[i] < 0 && j >= 0 && !seen.has(j); j = linkOf(j)) {
-        const pull = Math.min(-bal[i], Math.max(0, bal[j]));
+      for (let j = linkOf(i); bal[i] < want && j >= 0 && !seen.has(j); j = linkOf(j)) {
+        const pull = Math.min(want - bal[i], Math.max(0, bal[j]));
         bal[j] -= pull;
         bal[i] += pull;
         seen.add(j);
