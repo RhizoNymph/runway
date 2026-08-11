@@ -1289,6 +1289,12 @@ export default function BudgetPlanner() {
                     <TextInput value={v.name} placeholder="Scenario name"
                       onChange={(nm) => setVariants(variantsList.map((x) => (x.id === v.id ? { ...x, name: nm } : x)))} />
                   </span>
+                  <span className="bp-hint">starting</span>
+                  <span style={{ width: 128 }}
+                    title="Slides the whole scenario at once: default for tweaks without their own month, and a floor for the rest — a tweak dated later keeps its later date. Empty = each tweak's own month.">
+                    <MonthInput value={v.startMonth || ""}
+                      onChange={(nv) => setVariants(variantsList.map((x) => (x.id === v.id ? { ...x, startMonth: nv } : x)))} />
+                  </span>
                   <button className="bp-btn" onClick={() => applyVariantToPlan(v)}
                     title="Write these tweaks into the expense lines as scheduled changes and drop the scenario">
                     Apply to plan

@@ -6,26 +6,35 @@
 import { simulate, ymToAbs, absToYm, num } from "./engine.js";
 
 /* A tweak targets one expense line: from `startMonth` (empty/invalid = the
-   sim's start month) it either sets the amount or shifts it by a delta.
-   Each lands as an injected scheduled change appended after the item's own
-   changes, so a same-month "set" tweak wins and a delta stacks — the same
-   composition rules `valueAt` applies to everything else. */
+   variant's own start month, else the sim's) it either sets the amount or
+   shifts it by a delta. A variant-level `startMonth` slides the whole
+   scenario at once: it is the default for tweaks without a month of their
+   own, and a floor for the rest — a tweak dated earlier is pushed to it, a
+   tweak dated later keeps its later date (a post-move constraint survives
+   the slide). Each lands as an injected scheduled change appended after
+   the item's own changes, so a same-month "set" tweak wins and a delta
+   stacks — the same composition rules `valueAt` applies to everything
+   else. */
 export function applyVariant(model, variant) {
   const tweaks = (variant?.tweaks || []).filter((t) => t.itemId);
   if (!tweaks.length) return model;
   const startAbs = ymToAbs(model.settings.startMonth) ?? new Date().getFullYear() * 12;
-  const startM = absToYm(startAbs);
+  const varStart = ymToAbs(variant.startMonth);
   return {
     ...model,
     expenses: model.expenses.map((e) => {
       const mine = tweaks.filter((t) => t.itemId === e.id);
       if (!mine.length) return e;
-      const injected = mine.map((t, i) => ({
-        id: `tweak-${variant.id || "v"}-${t.id || i}`,
-        month: ymToAbs(t.startMonth) !== null ? t.startMonth : startM,
-        amount: num(t.amount),
-        mode: t.mode === "delta" ? "delta" : "set",
-      }));
+      const injected = mine.map((t, i) => {
+        const own = ymToAbs(t.startMonth) ?? startAbs;
+        const eff = varStart !== null ? Math.max(own, varStart) : own;
+        return {
+          id: `tweak-${variant.id || "v"}-${t.id || i}`,
+          month: absToYm(eff),
+          amount: num(t.amount),
+          mode: t.mode === "delta" ? "delta" : "set",
+        };
+      });
       return { ...e, changes: [...(e.changes || []), ...injected] };
     }),
   };

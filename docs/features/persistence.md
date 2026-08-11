@@ -123,10 +123,13 @@ horizon — see docs/features/compare_cli.md. Only copy a variant over
   ],
   "variants": [                    // what-if scenarios (What-if tab); read-only
     { "id": "v", "name": "All trims",   //   overlays until "Apply to plan"
+      "startMonth": "",            // slides the scenario: default for tweaks
+                                   //   without a month, floor for the rest
+                                   //   ("" = each tweak's own month)
       "tweaks": [ { "id": "t", "itemId": "<expense id>",
                     "mode": "set",   // "set" (default) | "delta"
                     "amount": 400,
-                    "startMonth": "" // "" = from the sim's first month
+                    "startMonth": "" // "" = variant/sim start
       } ] }
   ],
   "solver": { "itemId": null, "fromMonth": "", "cashFloor": 15000,

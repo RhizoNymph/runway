@@ -59,6 +59,33 @@ describe("applyVariant", () => {
     expect(valueAt(v.expenses[0], start, start)).toBe(2500);              // 3000 − 500
     expect(valueAt(v.expenses[0], ymToAbs("2026-04"), start)).toBe(3500); // the set resets the base
   });
+  it("a variant start month is the default for tweaks without their own", () => {
+    const m = model([expense("food", 885), expense("fun", 400)]);
+    const v = applyVariant(m, {
+      id: "v1", startMonth: "2026-04",
+      tweaks: [
+        { id: "t1", itemId: "food", mode: "set", amount: 400, startMonth: "" },
+        { id: "t2", itemId: "fun", mode: "delta", amount: -100, startMonth: "" },
+      ],
+    });
+    expect(valueAt(v.expenses[0], ymToAbs("2026-03"), start)).toBe(885);
+    expect(valueAt(v.expenses[0], ymToAbs("2026-04"), start)).toBe(400);
+    expect(valueAt(v.expenses[1], ymToAbs("2026-04"), start)).toBe(300);
+  });
+  it("the variant start pushes earlier tweak months but keeps later ones", () => {
+    const m = model([expense("early", 100), expense("late", 100)]);
+    const v = applyVariant(m, {
+      id: "v1", startMonth: "2026-06",
+      tweaks: [
+        { id: "t1", itemId: "early", mode: "set", amount: 50, startMonth: "2026-02" }, // pushed to Jun
+        { id: "t2", itemId: "late", mode: "set", amount: 50, startMonth: "2026-09" },  // stays Sep
+      ],
+    });
+    expect(valueAt(v.expenses[0], ymToAbs("2026-05"), start)).toBe(100);
+    expect(valueAt(v.expenses[0], ymToAbs("2026-06"), start)).toBe(50);
+    expect(valueAt(v.expenses[1], ymToAbs("2026-08"), start)).toBe(100);
+    expect(valueAt(v.expenses[1], ymToAbs("2026-09"), start)).toBe(50);
+  });
   it("does not mutate the input model and ignores unknown items", () => {
     const m = model([expense("food", 885)]);
     const before = JSON.stringify(m);
