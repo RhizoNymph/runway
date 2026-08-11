@@ -6,7 +6,7 @@ import {
 import { MON, num, ymToAbs, absToYm, absLabel, valueAt, oneTimeAmount, simulate } from "./engine.js";
 import { solveMax, trialItem } from "./solver.js";
 import { applyVariant, variantMetrics, withApplied } from "./variants.js";
-import { runSensitivity } from "./sensitivity.js";
+import { runSensitivity, METRICS } from "./sensitivity.js";
 
 /* ── persistence ──
    Primary store is data/model.json on disk, via the dev server's
@@ -793,6 +793,10 @@ export default function BudgetPlanner() {
   const setSensAxis = (which, p) =>
     patch({ sensitivity: { ...sens, [which]: { ...sens[which], ...p } } });
 
+  const sensOutputs = Array.isArray(sens.outputs) && sens.outputs.length === 2 && sens.outputs.every((k) => METRICS[k])
+    ? sens.outputs : ["maxRent", "endAtMax"];
+  const sensLabel = (k) => (k === "maxRent" ? `Max ${solverItem?.name || "rent"} (solver)` : METRICS[k]?.label || k);
+
   const runSens = () => {
     if (!sens.a?.itemId || !solverItem) return;
     setSensBusy(true);
@@ -806,8 +810,10 @@ export default function BudgetPlanner() {
             itemId: solverItem.id, fromMonth: solver.fromMonth, cashFloor: solver.cashFloor,
             endTarget: solver.endTarget, useEndTarget: solver.useEndTarget, rate,
           },
+          rate,
+          metrics: sensOutputs,
         });
-        setSensResult({ res, aName: sensItemName(sens.a), bName: sens.b?.itemId ? sensItemName(sens.b) : null });
+        setSensResult({ res, outputs: sensOutputs, aName: sensItemName(sens.a), bName: sens.b?.itemId ? sensItemName(sens.b) : null });
       } finally { setSensBusy(false); }
     }, 30);
   };
@@ -817,15 +823,17 @@ export default function BudgetPlanner() {
   const SENS_RAMP = ["#C4DEDF", "#8FBDBF", "#5C9EA1", "#2F7C80", "#0B4F53"];
   const sensCharts = useMemo(() => {
     if (!sensResult) return null;
-    const { res, aName, bName } = sensResult;
+    const { res, aName, bName, outputs } = sensResult;
     const multi = res.bValues[0] !== null;
     const seriesKeys = res.bValues.map((bv) => (multi ? money(bv) : "value"));
     const data = res.aValues.map((av, i) => {
       const row = { a: av };
       res.bValues.forEach((bv, j) => {
         const c = res.cells[j * res.aValues.length + i];
-        row[`rent:${seriesKeys[j]}`] = Number.isNaN(c.maxRent) ? null : Math.round(c.maxRent);
-        row[`end:${seriesKeys[j]}`] = Number.isNaN(c.end) ? null : Math.round(c.end);
+        for (const mkey of outputs) {
+          const v = c[mkey];
+          row[`${mkey}:${seriesKeys[j]}`] = v == null || Number.isNaN(v) ? null : Math.round(v);
+        }
       });
       return row;
     });
@@ -833,7 +841,7 @@ export default function BudgetPlanner() {
       ? SENS_RAMP[Math.round((j * (SENS_RAMP.length - 1)) / Math.max(1, res.bValues.length - 1))]
       : mono);
     const currentA = num((sensLists[sens.a?.kind] || []).find((x) => x.id === sens.a?.itemId)?.amount);
-    return { data, seriesKeys, aName, bName, multi, color, currentA };
+    return { data, seriesKeys, aName, bName, multi, color, currentA, outputs };
   }, [sensResult]);
 
   /* import / export */
@@ -1475,68 +1483,67 @@ export default function BudgetPlanner() {
                 <Field label="Lines (2–5)"><NumInput value={sens.b.steps} step={1} onChange={(v) => setSensAxis("b", { steps: v })} /></Field>
               </>}
             </div>
+            <div className="bp-fields" style={{ marginTop: 8 }}>
+              {[0, 1].map((slot) => (
+                <Field key={slot} label={`Chart ${slot + 1}`}>
+                  <select value={sensOutputs[slot]} onChange={(e) => {
+                    const next = [...sensOutputs];
+                    next[slot] = e.target.value;
+                    patch({ sensitivity: { ...sens, outputs: next } });
+                  }}>
+                    {Object.keys(METRICS).map((k) => <option key={k} value={k}>{sensLabel(k)}</option>)}
+                  </select>
+                </Field>
+              ))}
+            </div>
             <div className="bp-flex" style={{ marginTop: 12 }}>
               <button className="bp-btn solid" disabled={!sens.a?.itemId || sensBusy} onClick={runSens}>
                 {sensBusy ? "Computing…" : "Run analysis"}
               </button>
-              {sensBusy && <span className="bp-hint">running the solver across the grid…</span>}
+              {sensBusy && <span className="bp-hint">sweeping the grid…</span>}
             </div>
             <div className="bp-note">
-              Each grid point reruns the rent solver (its floor and starting month) at the
-              {" "}{baseScenario?.name || "headline"} rate, with applied what-ifs included; both charts read
-              that solve — end net worth is where you land if you actually pay the solved max. The sweep
-              replaces the item's base amount; scheduled changes still fold on top. Gaps mean even $0 fails
-              the floor.
+              Solver outputs rerun the rent solver per grid point (its floor and starting month) — "at that
+              max" is where you land if you actually pay the solved amount, and gaps mean even $0 fails.
+              Simulation outputs run the plan as swept instead — pick those when the swept item <em>is</em>{" "}
+              the rent. Everything uses the {baseScenario?.name || "headline"} rate with applied what-ifs
+              included; the sweep replaces the item's base amount, and scheduled changes still fold on top.
             </div>
 
             {sensCharts && <>
-              <div className="bp-eyebrow" style={{ marginTop: 18 }}>Max {solverItem?.name || "rent"} vs {sensCharts.aName}</div>
-              <div style={{ width: "100%", height: 260 }}>
-                <ResponsiveContainer>
-                  <LineChart data={sensCharts.data} margin={{ top: 8, right: 18, bottom: 4, left: 4 }}>
-                    <CartesianGrid stroke="#E3E6DD" strokeDasharray="3 3" vertical={false} />
-                    <XAxis dataKey="a" type="number" domain={["dataMin", "dataMax"]} tickFormatter={moneyK}
-                      tickLine={false} stroke="#C7CDBF" tick={{ fontSize: 10, fontFamily: "ui-monospace, monospace", fill: "#6E7A72" }} />
-                    <YAxis tickFormatter={moneyK} width={54} tickLine={false} stroke="#C7CDBF"
-                      tick={{ fontSize: 10, fontFamily: "ui-monospace, monospace", fill: "#6E7A72" }} />
-                    <Tooltip contentStyle={tooltipStyle} formatter={(v) => money(v)}
-                      labelFormatter={(l) => `${sensCharts.aName}: ${money(l)}`} />
-                    {sensCharts.multi && <Legend wrapperStyle={{ fontSize: 11, fontFamily: "ui-monospace, monospace" }} />}
-                    {sensCharts.currentA > 0 && <ReferenceLine x={sensCharts.currentA} stroke="#8A94A6" strokeDasharray="4 4" />}
-                    {sensCharts.seriesKeys.map((k, j) => (
-                      <Line key={k} type="monotone" dataKey={`rent:${k}`}
-                        name={sensCharts.multi ? `${sensCharts.bName} ${k}` : `Max ${solverItem?.name || "rent"}`}
-                        stroke={sensCharts.color(j, "#0E7C86")} strokeWidth={2}
-                        dot={{ r: 2.5 }} activeDot={{ r: 5 }} isAnimationActive={false} connectNulls={false} />
-                    ))}
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-
-              <div className="bp-eyebrow" style={{ marginTop: 14 }}>End net worth at that max vs {sensCharts.aName}</div>
-              <div style={{ width: "100%", height: 260 }}>
-                <ResponsiveContainer>
-                  <LineChart data={sensCharts.data} margin={{ top: 8, right: 18, bottom: 4, left: 4 }}>
-                    <CartesianGrid stroke="#E3E6DD" strokeDasharray="3 3" vertical={false} />
-                    <XAxis dataKey="a" type="number" domain={["dataMin", "dataMax"]} tickFormatter={moneyK}
-                      tickLine={false} stroke="#C7CDBF" tick={{ fontSize: 10, fontFamily: "ui-monospace, monospace", fill: "#6E7A72" }} />
-                    <YAxis tickFormatter={moneyK} width={54} tickLine={false} stroke="#C7CDBF"
-                      tick={{ fontSize: 10, fontFamily: "ui-monospace, monospace", fill: "#6E7A72" }} />
-                    <Tooltip contentStyle={tooltipStyle} formatter={(v) => money(v)}
-                      labelFormatter={(l) => `${sensCharts.aName}: ${money(l)}`} />
-                    {sensCharts.multi && <Legend wrapperStyle={{ fontSize: 11, fontFamily: "ui-monospace, monospace" }} />}
-                    {sensCharts.currentA > 0 && <ReferenceLine x={sensCharts.currentA} stroke="#8A94A6" strokeDasharray="4 4" />}
-                    {sensCharts.seriesKeys.map((k, j) => (
-                      <Line key={k} type="monotone" dataKey={`end:${k}`}
-                        name={sensCharts.multi ? `${sensCharts.bName} ${k}` : "End net worth"}
-                        stroke={sensCharts.color(j, "#2B4C9B")} strokeWidth={2}
-                        dot={{ r: 2.5 }} activeDot={{ r: 5 }} isAnimationActive={false} connectNulls={false} />
-                    ))}
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
+              {sensCharts.outputs.map((mkey, slot) => (
+                <React.Fragment key={`${mkey}-${slot}`}>
+                  <div className="bp-eyebrow" style={{ marginTop: slot === 0 ? 18 : 14 }}>
+                    {sensLabel(mkey)} vs {sensCharts.aName}
+                  </div>
+                  <div style={{ width: "100%", height: 260 }}>
+                    <ResponsiveContainer>
+                      <LineChart data={sensCharts.data} margin={{ top: 8, right: 18, bottom: 4, left: 4 }}>
+                        <CartesianGrid stroke="#E3E6DD" strokeDasharray="3 3" vertical={false} />
+                        <XAxis dataKey="a" type="number" domain={["dataMin", "dataMax"]} tickFormatter={moneyK}
+                          tickLine={false} stroke="#C7CDBF" tick={{ fontSize: 10, fontFamily: "ui-monospace, monospace", fill: "#6E7A72" }} />
+                        <YAxis tickFormatter={moneyK} width={54} tickLine={false} stroke="#C7CDBF"
+                          tick={{ fontSize: 10, fontFamily: "ui-monospace, monospace", fill: "#6E7A72" }} />
+                        <Tooltip contentStyle={tooltipStyle} formatter={(v) => money(v)}
+                          labelFormatter={(l) => `${sensCharts.aName}: ${money(l)}`} />
+                        {sensCharts.multi && <Legend wrapperStyle={{ fontSize: 11, fontFamily: "ui-monospace, monospace" }} />}
+                        {(mkey === "minCash" || mkey === "trough") &&
+                          <ReferenceLine y={num(solver.cashFloor)} stroke="#B3261E" strokeDasharray="4 4" />}
+                        {sensCharts.currentA > 0 && <ReferenceLine x={sensCharts.currentA} stroke="#8A94A6" strokeDasharray="4 4" />}
+                        {sensCharts.seriesKeys.map((k, j) => (
+                          <Line key={k} type="monotone" dataKey={`${mkey}:${k}`}
+                            name={sensCharts.multi ? `${sensCharts.bName} ${k}` : sensLabel(mkey)}
+                            stroke={sensCharts.color(j, slot === 0 ? "#0E7C86" : "#2B4C9B")} strokeWidth={2}
+                            dot={{ r: 2.5 }} activeDot={{ r: 5 }} isAnimationActive={false} connectNulls={false} />
+                        ))}
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                </React.Fragment>
+              ))}
               <div className="bp-note">
-                Dashed gray line marks the item's current amount{sensCharts.multi ? "; darker lines are higher values of the second item" : ""}.
+                Dashed gray line marks the item's current amount{sensCharts.multi ? "; darker lines are higher values of the second item" : ""};
+                on cash charts the dashed red line is the solver's floor.
                 Results are from the last run — hit "Run analysis" after editing the plan.
               </div>
             </>}

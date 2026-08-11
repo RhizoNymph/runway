@@ -49,13 +49,13 @@ describe("setItemAmount", () => {
 });
 
 describe("runSensitivity", () => {
-  it("one variable: max rent tracks income; end is what the max-rent plan keeps", () => {
+  it("one variable: max rent tracks income; end-at-max is what that plan keeps", () => {
     const r = runSensitivity(model(), { a: { kind: "income", itemId: "sal", min: 4000, max: 10000, steps: 3 }, solve, rate: 0 });
     expect(r.aValues).toEqual([4000, 7000, 10000]);
     expect(r.bValues).toEqual([null]);
     r.cells.forEach((c, i) => {
       expect(c.maxRent).toBeCloseTo(r.aValues[i], 1); // floor 0 → rent up to net income
-      expect(c.end).toBeCloseTo(0, 1);                // at max rent, the floor is all that's left
+      expect(c.endAtMax).toBeCloseTo(0, 1);           // at max rent, the floor is all that's left
     });
   });
   it("end at max rent equals the floor when the last month binds", () => {
@@ -66,7 +66,19 @@ describe("runSensitivity", () => {
       solve: { ...solve, cashFloor: 5000 }, rate: 0,
     });
     expect(r.cells[0].maxRent).toBeCloseTo(10000 + (12000 - 5000) / 12, 1);
-    expect(r.cells[0].end).toBeCloseTo(5000, 1);
+    expect(r.cells[0].endAtMax).toBeCloseTo(5000, 1);
+  });
+  it("simulation metrics sweep the plan as-is: rent as the variable", () => {
+    const r = runSensitivity(model(), {
+      a: { kind: "expense", itemId: "rent", min: 2000, max: 8000, steps: 2 },
+      solve, rate: 0, metrics: ["minCash", "endPlan"],
+    });
+    const [low, high] = r.cells;
+    expect(low.minCash).toBeCloseTo(8000, 1);            // first month's leftover, then rising
+    expect(low.endPlan).toBeCloseTo(12 * 8000, 1);
+    expect(high.minCash).toBeCloseTo(2000, 1);
+    expect(high.endPlan).toBeCloseTo(12 * 2000, 1);
+    expect(low.maxRent).toBeUndefined();                 // solver skipped when not requested
   });
   it("two variables: the second axis shifts both outputs cell by cell", () => {
     const r = runSensitivity(model(), {
@@ -78,16 +90,16 @@ describe("runSensitivity", () => {
     const cell = (i, j) => r.cells[j * r.aValues.length + i];
     expect(cell(0, 0).maxRent).toBeCloseTo(5000, 1);
     expect(cell(0, 1).maxRent).toBeCloseTo(4000, 1); // 1000 of "Other" crowds rent out
-    expect(cell(1, 1).end).toBeCloseTo(0, 1);        // max rent drains to the $0 floor
+    expect(cell(1, 1).endAtMax).toBeCloseTo(0, 1);   // max rent drains to the $0 floor
   });
-  it("marks infeasible cells with NaN in both outputs", () => {
+  it("marks infeasible cells with NaN in the solver outputs", () => {
     const r = runSensitivity(model(), {
       a: { kind: "income", itemId: "sal", min: 0, max: 1000, steps: 2 },
       solve: { ...solve, cashFloor: 1e9 }, rate: 0,
     });
     r.cells.forEach((c) => {
       expect(Number.isNaN(c.maxRent)).toBe(true);
-      expect(Number.isNaN(c.end)).toBe(true);
+      expect(Number.isNaN(c.endAtMax)).toBe(true);
     });
   });
 });

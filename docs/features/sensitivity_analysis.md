@@ -3,12 +3,15 @@
 ## Scope
 
 The Sensitivity tab: sweep the amount of one or two chosen items (any
-income, expense, or one-time line) across a range and chart, per grid
-point, the solver's max affordable amount and the ending net worth of
-the plan *at that solved max* — "if I take the most this scenario
-allows, where do I land". Pure grid logic in `src/sensitivity.js`
-(`axisValues`, `setItemAmount`, `runSensitivity`); controls and the two
-Recharts line charts live in `BudgetPlanner` (src/App.jsx).
+income, expense, or one-time line) across a range and chart two
+**configurable output metrics** per grid point. Solver metrics — max
+affordable amount, end net worth at that max — answer "what could I
+commit to"; simulation metrics — end net worth as swept, lowest cash,
+pre-overflow trough — answer "what does the plan as swept do" (the right
+pick when the swept item *is* the rent). Pure grid logic in
+`src/sensitivity.js` (`METRICS`, `axisValues`, `setItemAmount`,
+`runSensitivity`); controls and the two Recharts line charts live in
+`BudgetPlanner` (src/App.jsx).
 
 ## Non-scope
 
@@ -18,24 +21,27 @@ Recharts line charts live in `BudgetPlanner` (src/App.jsx).
 
 ## Data / control flow
 
-1. `model.sensitivity = { a, b }` — each axis `{ kind: "income" |
-   "expense" | "onetime", itemId, min, max, steps }`; `b` optional.
+1. `model.sensitivity = { a, b, outputs }` — each axis `{ kind: "income"
+   | "expense" | "onetime", itemId, min, max, steps }`; `b` optional;
+   `outputs` two `METRICS` keys (default `["maxRent", "endAtMax"]`).
    Picking an item defaults the range to 0…2× its current amount.
-2. `runSensitivity(model, { a, b, solve })` sweeps the grid
-   (`b` outer × `a` inner). Each cell replaces the items' **base
+2. `runSensitivity(model, { a, b, solve, rate, metrics })` sweeps the
+   grid (`b` outer × `a` inner). Each cell replaces the items' **base
    amounts** via `setItemAmount` (scheduled changes still fold on top),
-   then runs `solveMax` with the solver panel's settings at the headline
-   rate. Both outputs read that one solve: `maxRent` is the solved value
-   and `end` is its `endTotal` — the net worth you finish with if you
-   actually pay the max. Both are NaN where even $0 is infeasible.
+   then computes only what the chosen metrics need: `needs: "solve"`
+   metrics run `solveMax` with the solver panel's settings (`maxRent`,
+   `endAtMax` — NaN where even $0 is infeasible); `needs: "sim"` metrics
+   share one `variantMetrics` simulation of the swept plan (`endPlan`,
+   `minCash`, `trough`). All at the headline rate.
 3. The tab feeds the sweep the **effective** model, so applied what-if
    overlays are included.
-4. Two single-axis charts (never dual-axis): max rent vs A, and end net
-   worth vs A. With a second item, one line per B value colored on a
-   sequential teal ramp (light → dark as B grows — B is ordered, so a
-   ramp, not categorical hues) with a legend; single-variable charts use
-   the app's fixed teal/blue. A dashed reference line marks item A's
-   current amount. Infeasible cells render as gaps.
+4. Two single-axis charts (never dual-axis), one per chosen output. With
+   a second item, one line per B value colored on a sequential teal ramp
+   (light → dark as B grows — B is ordered, so a ramp, not categorical
+   hues) with a legend; single-variable charts use the app's fixed
+   teal/blue by slot. A dashed gray reference line marks item A's current
+   amount; cash metrics also draw the solver's floor as a dashed red
+   line. Infeasible cells render as gaps.
 
 ## Related files
 

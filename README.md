@@ -61,8 +61,9 @@ writes the same JSON as a download; **Import** reads one back.
   premiums, memberships — instead of being averaged across months.
 - The second scenario in the list drives the headline numbers and the solver.
 - The **Sensitivity** tab sweeps one or two items' amounts (an income, an
-  expense, or a one-time — e.g. stipend × relocation bonus) and charts the
-  max affordable rent and the end net worth you'd have paying that max,
+  expense, or a one-time — e.g. rent × relocation bonus) and charts two
+  outputs of your choice per grid point — max affordable rent, end net
+  worth at that max, or the swept plan's end net worth / lowest cash —
   one line per value of the second item.
 - The **What-if** tab holds named trim scenarios — per-expense "set to"/"± by"
   tweaks — simulated side by side against the live plan: month-one spend,

@@ -96,7 +96,7 @@ Features Index:
     depends_on: [simulation_engine, line_items, rent_solver]
     doc: docs/features/what_if_variants.md
   sensitivity_analysis:
-    description: Sweep one or two items' amounts over ranges and chart max affordable rent and the end net worth at that solved max, per grid point (Sensitivity tab)
+    description: Sweep one or two items' amounts over ranges and chart two configurable outputs per grid point — solver metrics (max rent, end NW at that max) or swept-plan metrics (end NW, lowest cash, pre-overflow trough) (Sensitivity tab)
     entry_points: [src/sensitivity.js:runSensitivity, "src/App.jsx (Sensitivity tab)"]
     depends_on: [simulation_engine, rent_solver, what_if_variants]
     doc: docs/features/sensitivity_analysis.md
