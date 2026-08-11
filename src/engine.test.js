@@ -264,6 +264,45 @@ describe("simulate — calendar-year tax", () => {
   });
 });
 
+describe("simulate — post-tax income", () => {
+  const partner = (amount, over = {}) => ({
+    id: "i2", name: "Partner take-home", amount, growth: 0, startMonth: "", endMonth: "", changes: [], afterTax: true, ...over,
+  });
+  it("lands in net untouched by flat tax and stays out of gross", () => {
+    const m = model({ flatTaxRate: 50 });
+    m.incomes.push(partner(2000));
+    const r = simulate(m, 0);
+    expect(r.rows[0].gross).toBe(10000);
+    expect(r.rows[0].tax).toBe(5000);
+    expect(r.rows[0].postTax).toBe(2000);
+    expect(r.rows[0].net).toBe(7000); // 10000 − 5000 + 2000
+  });
+  it("stays out of progressive tax and the 401(k)/match base", () => {
+    const m = model({ useFlatTax: false, mode401k: "maxEven", matchPct: 50, matchCapPct: 6 });
+    m.incomes.push(partner(5000));
+    const r = simulate(m, 0);
+    expect(r.rows.reduce((t, x) => t + x.tax, 0)).toBeCloseTo(annualTax(120000, 24000, m.settings));
+    expect(r.rows[0].c401).toBeCloseTo(2000);
+    expect(r.rows[0].match).toBeCloseTo(10000 * 0.06 * 0.5);
+  });
+  it("alone it funds the household but no pre-tax machinery", () => {
+    const m = model({ mode401k: "maxEven" });
+    m.incomes = [partner(5000)];
+    const r = simulate(m, 0);
+    expect(r.rows[0].gross).toBe(0);
+    expect(r.rows[0].c401).toBe(0);
+    expect(r.rows[0].tax).toBe(0);
+    expect(r.rows[0].net).toBe(5000);
+  });
+  it("honors windows and scheduled changes like any line item", () => {
+    const m = model({ flatTaxRate: 0 });
+    m.incomes.push(partner(2000, { startMonth: "2026-07" }));
+    const r = simulate(m, 0);
+    expect(r.rows[5].postTax).toBe(0);
+    expect(r.rows[6].postTax).toBe(2000);
+  });
+});
+
 describe("simulate — yearly expenses", () => {
   it("charges the annual amount in the right months only", () => {
     const m = model({}, {

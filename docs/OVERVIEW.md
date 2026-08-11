@@ -151,6 +151,10 @@ Features Index:
   is charged once a year in that calendar month (per-occurrence dollars, not
   averaged). Missing/other cadence = monthly; invalid cadenceMonth = January.
   See docs/features/line_items.md.
+- Income items may set `afterTax: true` ("post-tax" checkbox): the amount
+  skips gross, tax, FICA, and the 401(k)/match base and lands straight in
+  net — for money taxed on someone else's return (an unmarried partner's
+  take-home). Rows expose it as `postTax`; missing = taxable as before.
 - Growth compounds on anniversaries of the month the value in effect was
   last established — the base amount from the sim start, a scheduled
   change's value from its own change month (deltas apply to the grown value

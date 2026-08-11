@@ -15,6 +15,11 @@ startAbs)` in src/engine.js; editing is `ItemRow`/`ItemList` in src/App.jsx
 
 ## Resolution order in `valueAt`
 
+0. Income items may set `afterTax: true` ("post-tax" in the row's "…"
+   panel): the resolved value skips gross, tax, FICA, and the 401(k)/match
+   base entirely and lands straight in net (rows carry it as `postTax`).
+   For money taxed on someone else's return — an unmarried partner's
+   take-home. Resolution below is otherwise identical.
 1. `disabled: true` → $0 (the "Skip" checkbox).
 2. Outside `startMonth`/`endMonth` (inclusive; "" = unbounded) → $0.
 3. `cadence: "yearly"` → $0 unless the month's calendar month equals

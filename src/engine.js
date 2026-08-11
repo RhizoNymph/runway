@@ -155,7 +155,14 @@ export function simulate(model, annualReturnPct) {
       lastYear = year;
     }
 
-    const gross = incomes.reduce((t, i) => t + valueAt(i, abs, startAbs), 0);
+    // `afterTax: true` marks income that is already taxed on someone else's
+    // return (an unmarried partner's take-home, say): it skips this filer's
+    // tax, FICA, and 401(k)/match math and lands straight in net.
+    let gross = 0, postTax = 0;
+    for (const i of incomes) {
+      const v = valueAt(i, abs, startAbs);
+      if (i.afterTax) postTax += v; else gross += v;
+    }
 
     // pre-tax retirement contribution
     const c401 = contribution401k(settings, gross, ytd401k, abs % 12);
@@ -169,7 +176,7 @@ export function simulate(model, annualReturnPct) {
     const matchedPct = Math.min(electedPct, num(settings.matchCapPct));
     const match = gross * (matchedPct / 100) * (num(settings.matchPct) / 100);
 
-    months.push({ abs, year, gross, c401, match, tax: 0 });
+    months.push({ abs, year, gross, postTax, c401, match, tax: 0 });
   }
 
   /* tax: flat mode is a straight percentage per month. Otherwise each
@@ -208,8 +215,8 @@ export function simulate(model, annualReturnPct) {
   let minCash = Infinity, minCashAbs = startAbs, firstNegative = null;
 
   for (let k = 0; k < N; k++) {
-    const { abs, year, gross, c401, match, tax } = months[k];
-    const net = gross - c401 - tax;
+    const { abs, year, gross, postTax, c401, match, tax } = months[k];
+    const net = gross - c401 - tax + postTax;
     const exp = expenses.reduce((t, i) => t + valueAt(i, abs, startAbs), 0);
 
     let inflow = 0, outflow = 0;
@@ -298,7 +305,7 @@ export function simulate(model, annualReturnPct) {
 
     rows.push({
       abs, label: absLabel(abs), year,
-      gross, tax, c401, match, net, exp, inflow, outflow, transfers, surplus,
+      gross, postTax, tax, c401, match, net, exp, inflow, outflow, transfers, surplus,
       cash, invest, retire, total,
       saved: surplus + transfers + c401 + match,
       balances: [...bal],

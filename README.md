@@ -29,6 +29,9 @@ writes the same JSON as a download; **Import** reads one back.
 ## Notes on the model
 
 - One month per step. Balances compound monthly at `annual rate / 12`.
+- An income line can be marked **post-tax** (its "…" panel): money that's
+  already taxed on someone else's return — an unmarried partner's take-home —
+  skips your tax return, FICA, and 401(k) math and lands straight in net.
 - Taxes use 2025 federal and California brackets, the standard deduction, Social
   Security, Medicare and CA SDI, assessed on each calendar year's actual income
   (partial first/last years are annualized; months withhold their share in

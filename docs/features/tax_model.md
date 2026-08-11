@@ -15,6 +15,9 @@ pass inside `simulate` (src/engine.js).
 
 ## How a month's tax is computed
 
+- Income lines marked `afterTax: true` never enter this feature at all —
+  their value bypasses gross and joins net directly (see line_items). Only
+  taxable lines below.
 - `settings.useFlatTax` → `gross × flatTaxRate%`, per month, done.
 - Otherwise `simulate` runs a **pre-pass** (income/401(k) are independent
   of balances) and buckets the months by calendar year:

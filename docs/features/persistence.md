@@ -86,7 +86,10 @@ horizon — see docs/features/compare_cli.md. Only copy a variant over
   //                               // from that month on: "set" (default if
   //                               //   missing) replaces the amount; "delta"
   //                               //   adds it (negative allowed, stacks)
-  //   "disabled": false           // true = "Skip": excluded, data kept
+  //   "disabled": false,          // true = "Skip": excluded, data kept
+  //   "afterTax": false           // incomes only; true = already taxed on
+  //                               //   someone else's return: skips gross/
+  //                               //   tax/FICA/401(k), lands straight in net
   // }
   "oneTimes": [
     { "id": "o", "name": "Movers", "month": "2026-10", "amount": 6000,

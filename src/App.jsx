@@ -430,13 +430,13 @@ const Handle = (p) => <span {...p}>&#8942;&#8942;</span>;
 
 /* ────────────────────────────── item editor ────────────────────────────── */
 
-function ItemRow({ item, onChange, onRemove, dragRow, dragHandle, kind, startAbs }) {
+function ItemRow({ item, onChange, onRemove, dragRow, dragHandle, kind, startAbs, income }) {
   const [open, setOpen] = useState(false);
   const set = (patch) => onChange({ ...item, ...patch });
   const changes = item.changes || [];
   const nChanges = changes.length;
   const yearly = item.cadence === "yearly";
-  const scheduled = nChanges > 0 || item.startMonth || item.endMonth || yearly;
+  const scheduled = nChanges > 0 || item.startMonth || item.endMonth || yearly || item.afterTax;
 
   return (
     <div {...dragRow} style={item.disabled ? { opacity: 0.5 } : undefined}>
@@ -482,6 +482,14 @@ function ItemRow({ item, onChange, onRemove, dragRow, dragHandle, kind, startAbs
 
       {open && (
         <div className="bp-changes">
+          {income && (
+            <label className="bp-hint" style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 8 }}
+              title="For money that is already taxed on someone else's return — an unmarried partner's take-home, say. It skips your tax, FICA, and 401(k)/match math and lands straight in net income.">
+              <input type="checkbox" checked={!!item.afterTax}
+                onChange={(e) => set({ afterTax: e.target.checked })} />
+              post-tax: taxed on someone else's return; skips taxes and 401(k), lands straight in net
+            </label>
+          )}
           <div className="bp-grid" style={{ gridTemplateColumns: yearly ? "1fr 1fr 1fr" : "1fr 1fr", marginBottom: 8 }}>
             <Field label="Starts"><MonthInput value={item.startMonth} onChange={(v) => set({ startMonth: v })} /></Field>
             <Field label="Ends (last month)"><MonthInput value={item.endMonth} onChange={(v) => set({ endMonth: v })} /></Field>
@@ -527,7 +535,7 @@ function ItemRow({ item, onChange, onRemove, dragRow, dragHandle, kind, startAbs
   );
 }
 
-function ItemList({ items, setItems, addLabel, monthLabel, startAbs }) {
+function ItemList({ items, setItems, addLabel, monthLabel, startAbs, income }) {
   const total = items.reduce((t, i) => t + valueAt(i, startAbs, startAbs), 0);
   const { rowProps, handleProps } = useDragReorder(items, setItems);
   const yearlySum = items.reduce((t, i) => t + (i.cadence === "yearly" && !i.disabled ? num(i.amount) : 0), 0);
@@ -542,7 +550,7 @@ function ItemList({ items, setItems, addLabel, monthLabel, startAbs }) {
   return (
     <div>
       {items.map((it, idx) => (
-        <ItemRow key={it.id} item={it} kind={idx === 0 ? "first" : ""} startAbs={startAbs}
+        <ItemRow key={it.id} item={it} kind={idx === 0 ? "first" : ""} startAbs={startAbs} income={income}
           onChange={(v) => setItems(items.map((x) => (x.id === it.id ? v : x)))}
           onRemove={() => setItems(items.filter((x) => x.id !== it.id))}
           dragRow={rowProps(it.id)} dragHandle={handleProps(it.id)} />
@@ -683,7 +691,8 @@ export default function BudgetPlanner() {
     { k: (m0.surplus || 0) >= 0 ? "Left over" : "Shortfall", v: Math.abs(m0.surplus || 0), c: (m0.surplus || 0) >= 0 ? "#D9611A" : "#B3261E" },
   ];
   const allocTotal = alloc.reduce((t, a) => t + a.v, 0) || 1;
-  const savingsRate = m0.gross ? ((m0.c401 + m0.match + m0.transfers + Math.max(0, m0.surplus)) / m0.gross) * 100 : 0;
+  const income0 = (m0.gross || 0) + (m0.postTax || 0);
+  const savingsRate = income0 ? ((m0.c401 + m0.match + m0.transfers + Math.max(0, m0.surplus)) / income0) * 100 : 0;
 
   /* ── rent solver ── */
   const solverItem = expenses.find((e) => e.id === solver.itemId)
@@ -960,11 +969,13 @@ export default function BudgetPlanner() {
         {tab === "income" && (
           <div className="bp-card" style={{ marginTop: 0, borderTop: "none" }}>
             <div className="bp-eyebrow">Gross monthly income</div>
-            <ItemList items={incomes} setItems={(v) => patch({ incomes: v })}
+            <ItemList items={incomes} setItems={(v) => patch({ incomes: v })} income
               addLabel="Add income" monthLabel="Total gross, first month" startAbs={startAbs} />
             <div className="bp-note">
               Enter gross pay before tax. If you file jointly, add your spouse's gross as a second line —
-              taxes are computed on the combined total. Use a scheduled change for a raise, a new job, or a start date.
+              taxes are computed on the combined total. For a partner who files separately, enter their
+              take-home and mark the line "post-tax" (in its "…" panel) so it skips your tax return
+              and 401(k) math. Use a scheduled change for a raise, a new job, or a start date.
             </div>
           </div>
         )}
