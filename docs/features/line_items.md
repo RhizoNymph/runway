@@ -21,8 +21,11 @@ startAbs)` in src/engine.js; editing is `ItemRow`/`ItemList` in src/App.jsx
    `cadenceMonth` (1–12; anything else behaves as January). The amount is
    **per occurrence** — a $450/yr registration is $450 in that one month,
    not $37.50/mo.
-4. Base `amount`, replaced by the latest scheduled change whose month has
-   arrived (`changes` sorted by month).
+4. Base `amount`, folded through every scheduled change whose month has
+   arrived (`changes` sorted by month): `mode: "set"` (default, including
+   missing) replaces the value, `mode: "delta"` adds its amount to the
+   value in effect — negative allowed, consecutive deltas stack, a later
+   set resets the base.
 5. × `(1 + growth/100) ^ floor(elapsed months / 12)` — growth compounds on
    simulation-anniversary years, for yearly items too.
 
@@ -36,6 +39,10 @@ startAbs)` in src/engine.js; editing is `ItemRow`/`ItemList` in src/App.jsx
 - Below the list total, a note shows the yearly items' annual sum and the
   averaged monthly equivalent, since the "first month" total only includes
   yearly items charged in that month.
+- "Sort by amount" reorders the stored list (it composes with drag-reorder)
+  by monthly-equivalent amount — yearly items ÷ 12, skipped items last —
+  toggling descending/ascending per click. The One-time tab has its own
+  sort using each item's resolved dollar value in its month.
 
 ## Invariants and constraints
 

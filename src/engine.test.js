@@ -53,6 +53,31 @@ describe("valueAt", () => {
     expect(valueAt(item, ymToAbs("2026-03"), start)).toBe(100);
     expect(valueAt(item, ymToAbs("2026-04"), start)).toBe(250);
   });
+  it("a delta change adds to the value in effect instead of replacing it", () => {
+    const item = { amount: 100, growth: 0, startMonth: "", endMonth: "", changes: [{ id: "c", month: "2026-04", amount: 50, mode: "delta" }] };
+    expect(valueAt(item, ymToAbs("2026-03"), start)).toBe(100);
+    expect(valueAt(item, ymToAbs("2026-04"), start)).toBe(150);
+    expect(valueAt(item, ymToAbs("2026-12"), start)).toBe(150);
+  });
+  it("negative deltas reduce, deltas stack, and a later set resets the base", () => {
+    const item = {
+      amount: 100, growth: 0, startMonth: "", endMonth: "", changes: [
+        { id: "c1", month: "2026-04", amount: 50, mode: "delta" },
+        { id: "c2", month: "2026-06", amount: -30, mode: "delta" },
+        { id: "c3", month: "2026-08", amount: 90, mode: "set" },
+        { id: "c4", month: "2026-10", amount: 10, mode: "delta" },
+      ],
+    };
+    expect(valueAt(item, ymToAbs("2026-05"), start)).toBe(150);
+    expect(valueAt(item, ymToAbs("2026-07"), start)).toBe(120);
+    expect(valueAt(item, ymToAbs("2026-08"), start)).toBe(90);
+    expect(valueAt(item, ymToAbs("2026-10"), start)).toBe(100);
+  });
+  it("growth compounds on top of a delta'd value", () => {
+    const item = { amount: 100, growth: 10, startMonth: "", endMonth: "", changes: [{ id: "c", month: "2026-04", amount: 100, mode: "delta" }] };
+    expect(valueAt(item, ymToAbs("2026-04"), start)).toBe(200);
+    expect(valueAt(item, ymToAbs("2027-04"), start)).toBeCloseTo(220); // (100+100) × 1.1
+  });
   it("compounds annual growth yearly", () => {
     const item = { amount: 100, growth: 10, startMonth: "", endMonth: "", changes: [] };
     expect(valueAt(item, start + 11, start)).toBe(100);

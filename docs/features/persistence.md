@@ -81,8 +81,11 @@ horizon — see docs/features/compare_cli.md. Only copy a variant over
   //   "growth": 3,                // %/yr, compounds yearly
   //   "startMonth": "",           // "" = from the beginning
   //   "endMonth": "",             // inclusive last month; "" = forever
-  //   "changes": [ { "id": "c", "month": "2026-10", "amount": 3800 } ],
-  //                               // replaces amount from that month on
+  //   "changes": [ { "id": "c", "month": "2026-10", "amount": 3800,
+  //                  "mode": "set" } ],
+  //                               // from that month on: "set" (default if
+  //                               //   missing) replaces the amount; "delta"
+  //                               //   adds it (negative allowed, stacks)
   //   "disabled": false           // true = "Skip": excluded, data kept
   // }
   "oneTimes": [

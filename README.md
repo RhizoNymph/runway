@@ -44,7 +44,8 @@ writes the same JSON as a download; **Import** reads one back.
 - A one-time item can be a fixed dollar amount or a percentage of an expense
   line's rate in that month — e.g. "Deposit + first month" as 200% of rent.
   Linked items follow the rent solver's answer automatically.
-- Scheduled changes replace a line item's amount from that month onward. Annual
+- Scheduled changes adjust a line item from a month onward — "set to" replaces
+  the amount, "± by" shifts it by a positive or negative difference. Annual
   growth compounds yearly on top of whatever amount is in effect.
 - A line item can recur monthly or once per year ("Every: year"): the full
   amount is charged in its chosen calendar month — registration, annual

@@ -248,7 +248,7 @@ const CSS = `
   .bp-item > :first-child, .bp-onetime > :first-child, .bp-acct > :first-child { grid-column:1 / -1; }
 }
 .bp-changes { margin:6px 0 4px 0; padding-left:12px; border-left:2px solid var(--pen4); }
-.bp-chg { display:grid; grid-template-columns:1fr 1fr 30px; gap:8px; align-items:end; margin-bottom:6px; }
+.bp-chg { display:grid; grid-template-columns:1fr 74px 1fr 30px; gap:8px; align-items:end; margin-bottom:6px; }
 .bp-tot { display:flex; justify-content:space-between; font-family:var(--mono); font-size:13px;
   font-variant-numeric:tabular-nums; padding-top:10px; margin-top:4px; border-top:2px solid var(--ink); }
 
@@ -498,7 +498,15 @@ function ItemRow({ item, onChange, onRemove, dragRow, dragHandle, kind, startAbs
               <Field label={i === 0 ? "From month" : ""}>
                 <MonthInput value={c.month} onChange={(v) => set({ changes: changes.map((x) => x.id === c.id ? { ...x, month: v } : x) })} />
               </Field>
-              <Field label={i === 0 ? "New $ / month" : ""}>
+              <Field label={i === 0 ? "Mode" : ""}>
+                <select value={c.mode === "delta" ? "delta" : "set"}
+                  title="'set to' replaces the amount; '± by' adds to whatever is in effect then (negative allowed)"
+                  onChange={(e) => set({ changes: changes.map((x) => x.id === c.id ? { ...x, mode: e.target.value } : x) })}>
+                  <option value="set">set to</option>
+                  <option value="delta">&#177; by</option>
+                </select>
+              </Field>
+              <Field label={i === 0 ? "$ / month" : ""}>
                 <NumInput value={c.amount} step={10} onChange={(v) => set({ changes: changes.map((x) => x.id === c.id ? { ...x, amount: v } : x) })} />
               </Field>
               <button className="bp-x" onClick={() => set({ changes: changes.filter((x) => x.id !== c.id) })}>&#10005;</button>
@@ -508,7 +516,10 @@ function ItemRow({ item, onChange, onRemove, dragRow, dragHandle, kind, startAbs
             onClick={() => set({ changes: [...changes, { id: uid(), month: "", amount: item.amount }] })}>
             + Change on a date
           </button>
-          <div className="bp-note">Each change replaces the amount from that month onward.</div>
+          <div className="bp-note">
+            "Set to" replaces the amount from that month onward; "&#177; by" adds to whatever is in effect
+            (use a negative number to decrease). Deltas stack until a "set to" resets the base.
+          </div>
         </div>
       )}
     </div>
@@ -519,6 +530,14 @@ function ItemList({ items, setItems, addLabel, monthLabel, startAbs }) {
   const total = items.reduce((t, i) => t + valueAt(i, startAbs, startAbs), 0);
   const { rowProps, handleProps } = useDragReorder(items, setItems);
   const yearlySum = items.reduce((t, i) => t + (i.cadence === "yearly" && !i.disabled ? num(i.amount) : 0), 0);
+  const [sortDesc, setSortDesc] = useState(true);
+  // monthly-equivalent amount; skipped items sink to the bottom either way
+  const sortKey = (i) => (i.disabled ? -1 : num(i.amount) / (i.cadence === "yearly" ? 12 : 1));
+  const sortByAmount = () => {
+    const dir = sortDesc ? 1 : -1;
+    setItems([...items].sort((a, b) => (sortKey(b) - sortKey(a)) * dir));
+    setSortDesc(!sortDesc);
+  };
   return (
     <div>
       {items.map((it, idx) => (
@@ -534,10 +553,14 @@ function ItemList({ items, setItems, addLabel, monthLabel, startAbs }) {
           in its month, so monthly totals spike there.
         </div>
       )}
-      <div style={{ marginTop: 12 }}>
+      <div className="bp-flex" style={{ marginTop: 12 }}>
         <button className="bp-btn" onClick={() => setItems([...items, {
           id: uid(), name: "", amount: 0, growth: 0, startMonth: "", endMonth: "", changes: [],
         }])}>+ {addLabel}</button>
+        <button className="bp-btn ghost" onClick={sortByAmount}
+          title="Reorders the list by monthly-equivalent amount (yearly items ÷ 12); skipped items go last. Click again to flip direction.">
+          Sort by amount {sortDesc ? "↓" : "↑"}
+        </button>
       </div>
     </div>
   );
@@ -560,6 +583,7 @@ export default function BudgetPlanner() {
   const setSolver = (p) => setModel((m) => ({ ...m, solver: { ...m.solver, ...p } }));
 
   const dragOneTimes = useDragReorder(oneTimes, (v) => patch({ oneTimes: v }));
+  const [otSortDesc, setOtSortDesc] = useState(true);
   const dragAccounts = useDragReorder(accounts, (v) => patch({ accounts: v }));
   const dragScenarios = useDragReorder(scenarios, (v) => patch({ scenarios: v }));
 
@@ -1037,10 +1061,20 @@ export default function BudgetPlanner() {
                 </div>
               );
             })}
-            <div style={{ marginTop: 12 }}>
+            <div className="bp-flex" style={{ marginTop: 12 }}>
               <button className="bp-btn" onClick={() => patch({
                 oneTimes: [...oneTimes, { id: uid(), name: "", month: absToYm(startAbs), amount: 0, kind: "out" }],
               })}>+ Add a one-time item</button>
+              <button className="bp-btn ghost"
+                title="Reorders the list by each item's resolved dollar amount (% items use the linked expense in their month); skipped items go last. Click again to flip direction."
+                onClick={() => {
+                  const key = (o) => (o.disabled ? -1 : oneTimeAmount(o, expenses, ymToAbs(o.month) ?? startAbs, startAbs));
+                  const dir = otSortDesc ? 1 : -1;
+                  patch({ oneTimes: [...oneTimes].sort((a, b) => (key(b) - key(a)) * dir) });
+                  setOtSortDesc(!otSortDesc);
+                }}>
+                Sort by amount {otSortDesc ? "↓" : "↑"}
+              </button>
             </div>
             <div className="bp-note">
               Relocation lump sums are usually taxed as income. Enter the gross as money in and the extra tax as

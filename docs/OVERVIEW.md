@@ -111,6 +111,7 @@ Features Index:
 | `vite.config.js` | Port 5180, relative base for static hosting |
 | `scripts/analyze-statements.js` | CLI: bank-statement PDFs → `data/analysis/` ledger + report (`npm run analyze:statements`) |
 | `scripts/statements/*.js` | Pure statement parser / categorizer / aggregator / report modules + tests |
+| `scripts/trim-report.js` | Regenerates `data/variants/TRIMS.md` + trim variant files from `data/model.json` (`npm run trims:report`) |
 
 ## Invariants and constraints
 

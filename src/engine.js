@@ -86,7 +86,8 @@ export function valueAt(item, abs, startAbs) {
   const cs = (item.changes || [])
     .filter((c) => ymToAbs(c.month) !== null)
     .sort((a, b) => ymToAbs(a.month) - ymToAbs(b.month));
-  for (const c of cs) if (abs >= ymToAbs(c.month)) v = num(c.amount);
+  // "set" (default) replaces the amount; "delta" adds to the value in effect
+  for (const c of cs) if (abs >= ymToAbs(c.month)) v = c.mode === "delta" ? v + num(c.amount) : num(c.amount);
   const g = num(item.growth) / 100;
   if (g) v *= Math.pow(1 + g, Math.max(0, Math.floor((abs - startAbs) / 12)));
   return v;
