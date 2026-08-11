@@ -139,15 +139,12 @@ export function simulate(model, annualReturnPct) {
   const startAbs = ymToAbs(settings.startMonth) ?? new Date().getFullYear() * 12;
   const N = Math.max(1, Math.min(600, Math.round(num(settings.horizonMonths))));
 
-  let bal = accounts.map((a) => num(a.balance));
-  const primaryIdx = Math.max(0, accounts.findIndex((a) => a.primary));
-  const retireIdx = accounts.findIndex((a) => a.type === "retirement");
-
-  const rows = [];
+  /* pass 1: income, 401(k), and employer match are independent of account
+     balances — compute them per month up front so tax can be assessed on
+     calendar-year totals rather than each month annualized. */
+  const months = [];
   let ytd401k = 0;
   let lastYear = null;
-  let minCash = Infinity, minCashAbs = startAbs, firstNegative = null;
-
   for (let k = 0; k < N; k++) {
     const abs = startAbs + k;
     const year = Math.floor(abs / 12);
@@ -172,10 +169,46 @@ export function simulate(model, annualReturnPct) {
     const matchedPct = Math.min(electedPct, num(settings.matchCapPct));
     const match = gross * (matchedPct / 100) * (num(settings.matchPct) / 100);
 
-    const tax = settings.useFlatTax
-      ? gross * (num(settings.flatTaxRate) / 100)
-      : annualTax(gross * 12, c401 * 12, settings) / 12;
+    months.push({ abs, year, gross, c401, match, tax: 0 });
+  }
 
+  /* tax: flat mode is a straight percentage per month. Otherwise each
+     calendar year is taxed on its actual simulated totals — a partial first
+     or last year annualized by scaling its months up to twelve, prior-YTD
+     401(k) joining the first year's deduction — and every month withholds
+     its share of the year's bill in proportion to its gross. */
+  if (settings.useFlatTax) {
+    for (const m of months) m.tax = m.gross * (num(settings.flatTaxRate) / 100);
+  } else {
+    const byYear = new Map();
+    for (const m of months) {
+      if (!byYear.has(m.year)) byYear.set(m.year, []);
+      byYear.get(m.year).push(m);
+    }
+    const firstYear = Math.floor(startAbs / 12);
+    const limit = num(settings.limit401k);
+    for (const [year, ms] of byYear) {
+      const sumGross = ms.reduce((t, m) => t + m.gross, 0);
+      const sumPre = ms.reduce((t, m) => t + m.c401, 0);
+      const scale = ms.length < 12 ? 12 / ms.length : 1;
+      const estGross = sumGross * scale;
+      let estPre = year === firstYear ? sumPre + num(settings.ytd401k) : sumPre * scale;
+      if (limit > 0) estPre = Math.min(estPre, limit);
+      const yearTax = annualTax(estGross, estPre, settings);
+      for (const m of ms) m.tax = estGross > 0 ? yearTax * (m.gross / estGross) : 0;
+    }
+  }
+
+  /* pass 2: cash flows, transfers, overflow, and balances */
+  let bal = accounts.map((a) => num(a.balance));
+  const primaryIdx = Math.max(0, accounts.findIndex((a) => a.primary));
+  const retireIdx = accounts.findIndex((a) => a.type === "retirement");
+
+  const rows = [];
+  let minCash = Infinity, minCashAbs = startAbs, firstNegative = null;
+
+  for (let k = 0; k < N; k++) {
+    const { abs, year, gross, c401, match, tax } = months[k];
     const net = gross - c401 - tax;
     const exp = expenses.reduce((t, i) => t + valueAt(i, abs, startAbs), 0);
 

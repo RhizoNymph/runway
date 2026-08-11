@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { valueAt, contribution401k, oneTimeAmount, simulate, ymToAbs, absToYm } from "./engine.js";
+import { valueAt, contribution401k, oneTimeAmount, simulate, annualTax, ymToAbs, absToYm } from "./engine.js";
 
 const settings = (over = {}) => ({
   startMonth: "2026-01",
@@ -224,6 +224,43 @@ describe("simulate — pct mode is unchanged", () => {
     delete m.settings.ytd401k;
     const r = simulate(m, 0);
     expect(r.rows[0].c401).toBeCloseTo(1000);
+  });
+});
+
+describe("simulate — calendar-year tax", () => {
+  it("a steady full year pays exactly the annual tax, spread evenly", () => {
+    const m = model({ useFlatTax: false });
+    const r = simulate(m, 0);
+    const expected = annualTax(120000, 0, m.settings);
+    expect(r.rows.reduce((t, x) => t + x.tax, 0)).toBeCloseTo(expected);
+    r.rows.forEach((x) => expect(x.tax).toBeCloseTo(expected / 12));
+  });
+  it("a mid-year raise is taxed on the year's actual total, not each month annualized", () => {
+    const m = model({ useFlatTax: false });
+    m.incomes[0].changes = [{ id: "c", month: "2026-07", amount: 20000 }];
+    const r = simulate(m, 0);
+    const annual = 6 * 10000 + 6 * 20000;
+    const expected = annualTax(annual, 0, m.settings);
+    expect(r.rows.reduce((t, x) => t + x.tax, 0)).toBeCloseTo(expected);
+    // withholding follows each month's share of the year's income
+    expect(r.rows[0].tax).toBeCloseTo(expected * (10000 / annual));
+    expect(r.rows[11].tax).toBeCloseTo(expected * (20000 / annual));
+  });
+  it("annualizes a partial first year and deducts prior-YTD 401(k) once", () => {
+    const m = model({ useFlatTax: false, mode401k: "maxEven", startMonth: "2026-09", horizonMonths: 4, ytd401k: 12000 });
+    const r = simulate(m, 0);
+    // Sep–Dec at 10000 → estimated 120000 full-year gross; 401(k) deduction is
+    // the 12000 contributed in-sim plus the 12000 already contributed = 24000.
+    // The four simulated months withhold their share of the year's bill.
+    const expected = annualTax(120000, 24000, m.settings) * (40000 / 120000);
+    expect(r.rows.reduce((t, x) => t + x.tax, 0)).toBeCloseTo(expected);
+  });
+  it("each calendar year is taxed separately", () => {
+    const m = model({ useFlatTax: false, horizonMonths: 24 });
+    m.incomes[0].changes = [{ id: "c", month: "2027-01", amount: 30000 }];
+    const r = simulate(m, 0);
+    expect(r.rows.slice(0, 12).reduce((t, x) => t + x.tax, 0)).toBeCloseTo(annualTax(120000, 0, m.settings));
+    expect(r.rows.slice(12).reduce((t, x) => t + x.tax, 0)).toBeCloseTo(annualTax(360000, 0, m.settings));
   });
 });
 
