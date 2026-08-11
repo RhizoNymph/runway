@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { applyVariant, variantMetrics } from "./variants.js";
+import { applyVariant, variantMetrics, withApplied } from "./variants.js";
 import { valueAt, ymToAbs } from "./engine.js";
 
 const settings = (over = {}) => ({
@@ -92,6 +92,26 @@ describe("applyVariant", () => {
     const v = applyVariant(m, { id: "v1", tweaks: [{ id: "t1", itemId: "nope", mode: "set", amount: 1, startMonth: "" }] });
     expect(JSON.stringify(m)).toBe(before);
     expect(v.expenses[0].changes).toHaveLength(0);
+  });
+});
+
+describe("withApplied", () => {
+  it("overlays only checked variants, in list order", () => {
+    const m = {
+      ...model([expense("food", 885)]),
+      variants: [
+        { id: "v1", applied: true, tweaks: [{ id: "t1", itemId: "food", mode: "set", amount: 400, startMonth: "" }] },
+        { id: "v2", tweaks: [{ id: "t1", itemId: "food", mode: "set", amount: 100, startMonth: "" }] },
+        { id: "v3", applied: true, tweaks: [{ id: "t1", itemId: "food", mode: "delta", amount: -50, startMonth: "" }] },
+      ],
+    };
+    const eff = withApplied(m);
+    expect(valueAt(eff.expenses[0], start, start)).toBe(350); // set 400, then −50; v2 unchecked
+    expect(valueAt(m.expenses[0], start, start)).toBe(885);   // raw model untouched
+  });
+  it("is the identity without variants", () => {
+    const m = model([expense("food", 885)]);
+    expect(withApplied(m)).toBe(m);
   });
 });
 

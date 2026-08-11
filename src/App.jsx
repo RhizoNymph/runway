@@ -5,7 +5,7 @@ import {
 } from "recharts";
 import { MON, num, ymToAbs, absToYm, absLabel, valueAt, oneTimeAmount, simulate } from "./engine.js";
 import { solveMax, trialItem } from "./solver.js";
-import { applyVariant, variantMetrics } from "./variants.js";
+import { applyVariant, variantMetrics, withApplied } from "./variants.js";
 
 /* ── persistence ──
    Primary store is data/model.json on disk, via the dev server's
@@ -591,6 +591,10 @@ export default function BudgetPlanner() {
 
   const { settings, incomes, expenses, oneTimes, accounts, scenarios, solver } = model;
   const patch = (p) => setModel((m) => ({ ...m, ...p }));
+  const variantsList = model.variants || [];
+  /* what-if scenarios checked "applied" overlay the live plan everywhere
+     below (charts, readouts, solver); the editors keep the raw lines */
+  const effective = useMemo(() => withApplied(model), [model]);
   const setSettings = (p) => setModel((m) => ({ ...m, settings: { ...m.settings, ...p } }));
   const setSolver = (p) => setModel((m) => ({ ...m, solver: { ...m.solver, ...p } }));
 
@@ -658,9 +662,9 @@ export default function BudgetPlanner() {
   /* run every scenario */
   const sims = useMemo(() => {
     const out = {};
-    scenarios.forEach((s) => { out[s.id] = simulate(model, num(s.rate)); });
+    scenarios.forEach((s) => { out[s.id] = simulate(effective, num(s.rate)); });
     return out;
-  }, [model, scenarios]);
+  }, [effective, scenarios]);
 
   const baseScenario = scenarios[Math.min(1, scenarios.length - 1)] || scenarios[0];
   const base = sims[baseScenario?.id] || simulate(model, 7);
@@ -704,7 +708,7 @@ export default function BudgetPlanner() {
 
   function runSolver() {
     if (!solverItem) return;
-    setSolved(solveMax(model, {
+    setSolved(solveMax(effective, {
       itemId: solverItem.id,
       fromMonth: solver.fromMonth,
       cashFloor: solver.cashFloor,
@@ -726,17 +730,26 @@ export default function BudgetPlanner() {
   }
 
   /* ── what-if variants: overlays compared against the live baseline ── */
-  const variantsList = model.variants || [];
   const setVariants = (v) => patch({ variants: v });
   const setTweak = (v, t, p) => setVariants(variantsList.map((x) => x.id === v.id
     ? { ...x, tweaks: (x.tweaks || []).map((y) => (y.id === t.id ? { ...y, ...p } : y)) } : x));
 
+  /* baseline = the plan with every applied scenario on. An unapplied row
+     adds its scenario on top; an applied row shows the plan *without* it,
+     so every delta reads as "what toggling this checkbox does". */
   const whatif = useMemo(() => {
     if (tab !== "whatif") return null;
     const rate = num(baseScenario?.rate ?? 7);
+    const applied = variantsList.filter((v) => v.applied);
+    const withoutOne = (skipId) =>
+      applied.filter((v) => v.id !== skipId).reduce((m, v) => applyVariant(m, v), model);
     const rows = [
-      { id: "baseline", name: "Baseline (current plan)", varied: model },
-      ...variantsList.map((v) => ({ id: v.id, name: v.name || "(unnamed)", varied: applyVariant(model, v) })),
+      { id: "baseline", name: "Baseline (current plan)", varied: effective },
+      ...variantsList.map((v) => ({
+        id: v.id,
+        name: (v.name || "(unnamed)") + (v.applied ? " — applied; this row removes it" : ""),
+        varied: v.applied ? withoutOne(v.id) : applyVariant(effective, v),
+      })),
     ];
     return rows.map((row) => {
       const met = variantMetrics(row.varied, rate);
@@ -750,10 +763,10 @@ export default function BudgetPlanner() {
       }
       return { ...row, ...met, maxRent };
     });
-  }, [tab, model, showMaxRent]);
+  }, [tab, model, effective, showMaxRent]);
 
-  const applyVariantToPlan = (v) => {
-    if (!confirm(`Bake "${v.name || "this scenario"}" into the expense lines and remove it from the list?`)) return;
+  const bakeVariant = (v) => {
+    if (!confirm(`Permanently write "${v.name || "this scenario"}" into the expense lines and remove it from the list?`)) return;
     const baked = applyVariant(model, v);
     patch({ expenses: baked.expenses, variants: variantsList.filter((x) => x.id !== v.id) });
   };
@@ -982,7 +995,8 @@ export default function BudgetPlanner() {
         {/* TABS */}
         <div className="bp-tabs">
           {[["expenses", "Expenses"], ["income", "Income"], ["onetime", "One-time"],
-            ["accounts", "Accounts & 401(k)"], ["whatif", "What-if"],
+            ["accounts", "Accounts & 401(k)"],
+            ["whatif", `What-if${variantsList.filter((v) => v.applied).length ? ` (${variantsList.filter((v) => v.applied).length} on)` : ""}`],
             ["settings", "Taxes & scenarios"], ["table", "Year by year"]]
             .map(([k, l]) => (
               <button key={k} className="bp-tab" data-on={tab === k ? "1" : "0"} onClick={() => setTab(k)}>{l}</button>
@@ -1275,16 +1289,24 @@ export default function BudgetPlanner() {
               with the solver panel's floor and starting month)
             </label>
             <div className="bp-note">
-              Scenarios are overlays on the live plan — edit any expense or income and every row recomputes;
-              nothing here changes the plan until you hit "Apply". Trough cash is the lowest point before the
-              first overflow link starts (the drawdown bottom that cap-skimming later hides); end net worth uses
-              the {baseScenario?.name || "headline"} scenario. A "&#177; by" tweak lasts until the line's next
-              "set to" change, like any delta.
+              Scenarios are overlays on the live plan — edit any expense or income and every row recomputes.
+              Checking "applied" folds a scenario into the plan everywhere (charts, readouts, solver) without
+              touching the expense lines; its row then shows the plan <em>without</em> it, so every delta reads
+              as "what toggling this checkbox does". "Bake into plan" makes it permanent. Trough cash is the
+              lowest point before the first overflow link starts (the drawdown bottom that cap-skimming later
+              hides); end net worth uses the {baseScenario?.name || "headline"} scenario. A "&#177; by" tweak
+              lasts until the line's next "set to" change, like any delta.
             </div>
 
             {variantsList.map((v) => (
               <div key={v.id} style={{ marginTop: 14, paddingTop: 10, borderTop: "1px solid var(--rule)" }}>
                 <div className="bp-flex">
+                  <label className="bp-hint" style={{ display: "flex", gap: 4, alignItems: "center" }}
+                    title="Overlay this scenario on the live plan — charts, readouts, and the solver all include it while the expense lines stay untouched. Uncheck to revert.">
+                    <input type="checkbox" checked={!!v.applied}
+                      onChange={(e) => setVariants(variantsList.map((x) => (x.id === v.id ? { ...x, applied: e.target.checked } : x)))} />
+                    applied
+                  </label>
                   <span style={{ flex: "1 1 220px" }}>
                     <TextInput value={v.name} placeholder="Scenario name"
                       onChange={(nm) => setVariants(variantsList.map((x) => (x.id === v.id ? { ...x, name: nm } : x)))} />
@@ -1295,9 +1317,9 @@ export default function BudgetPlanner() {
                     <MonthInput value={v.startMonth || ""}
                       onChange={(nv) => setVariants(variantsList.map((x) => (x.id === v.id ? { ...x, startMonth: nv } : x)))} />
                   </span>
-                  <button className="bp-btn" onClick={() => applyVariantToPlan(v)}
-                    title="Write these tweaks into the expense lines as scheduled changes and drop the scenario">
-                    Apply to plan
+                  <button className="bp-btn" onClick={() => bakeVariant(v)}
+                    title="Permanently write these tweaks into the expense lines as scheduled changes and drop the scenario">
+                    Bake into plan
                   </button>
                   <button className="bp-x" title="Remove scenario"
                     onClick={() => setVariants(variantsList.filter((x) => x.id !== v.id))}>&#10005;</button>

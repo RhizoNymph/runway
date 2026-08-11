@@ -40,6 +40,14 @@ export function applyVariant(model, variant) {
   };
 }
 
+/* The model as the app actually simulates it: every variant whose
+   `applied` checkbox is on, overlaid in list order. Consumers that render
+   or compare "the current plan" (charts, solver, compare CLI) go through
+   this; editors keep working on the raw model. */
+export function withApplied(model) {
+  return (model.variants || []).filter((v) => v.applied).reduce((m, v) => applyVariant(m, v), model);
+}
+
 /* Comparison metrics for one model at one return rate. `trough` is the
    lowest cash strictly before the earliest `overflowStart` month — the
    drawdown bottom that later cap-skimming would otherwise hide — falling

@@ -3,6 +3,7 @@
    No I/O here — the CLI wrapper (scripts/compare.js) handles files. */
 
 import { simulate, ymToAbs, absToYm, absLabel, num } from "../../src/engine.js";
+import { withApplied } from "../../src/variants.js";
 
 const LIST_SECTIONS = ["incomes", "expenses", "oneTimes", "accounts", "scenarios"];
 
@@ -108,8 +109,9 @@ const deltaOf = (a, b) => a && b
 export function compareModels(baseline, variant, { at } = {}) {
   const scenA = baseScenario(baseline);
   const scenB = baseScenario(variant);
-  const simA = simulate(baseline, num(scenA.rate));
-  const simB = simulate(variant, num(scenB.rate));
+  // honor applied what-if overlays, same as the app's charts and solver
+  const simA = simulate(withApplied(baseline), num(scenA.rate));
+  const simB = simulate(withApplied(variant), num(scenB.rate));
   const startA = startAbsOf(baseline);
   const startB = startAbsOf(variant);
 

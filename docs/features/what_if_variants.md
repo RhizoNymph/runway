@@ -40,9 +40,16 @@ plan" live in `BudgetPlanner` (src/App.jsx).
 4. Optional max-rent column (checkbox): reruns `solveMax` per row with the
    solver panel's item/floor/month — off by default since it's ~45 sims per
    scenario per recompute.
-5. **Apply to plan** bakes a scenario's injected changes into the real
-   expense lines (via `applyVariant`) and removes the scenario from the
-   list, preventing double-application.
+5. **Applied** (per-scenario checkbox): the scenario overlays the live plan
+   everywhere — `withApplied(model)` is what the charts, readouts, solver,
+   and the compare/trim CLIs actually simulate — while the raw expense
+   lines stay untouched; unchecking reverts. In the table, the baseline row
+   includes every applied scenario; an applied scenario's own row shows the
+   plan *without* it, so all deltas read as "what toggling this checkbox
+   does". The tab label counts applied scenarios.
+6. **Bake into plan** permanently writes a scenario's injected changes into
+   the real expense lines (via `applyVariant`) and removes the scenario
+   from the list, preventing double-application.
 
 ## Related files
 
@@ -57,9 +64,13 @@ plan" live in `BudgetPlanner` (src/App.jsx).
 - `variants` is part of the saved model (autosave/export/import carry it);
   missing key = no scenarios (old saves unchanged, `makeDefaults` seeds
   `[]`).
-- Scenarios never affect the simulation, charts, or solver until applied —
-  they are read-only overlays computed on demand (tab active only).
+- Unapplied scenarios never affect the simulation, charts, or solver —
+  they are read-only overlays computed on demand (tab active only). Applied
+  ones flow through `withApplied` only; nothing else may mutate the lines.
+- Every consumer of "the current plan" must go through `withApplied`
+  (App `effective`, compare CLI, trim report) or applied scenarios would
+  silently disagree between surfaces.
 - Tweak injection must go through `applyVariant` so composition semantics
-  stay identical between the table and "Apply to plan".
+  stay identical between the table, "applied", and "Bake into plan".
 - Tweaks reference expenses by `itemId`; deleting an expense silently
   orphans its tweaks (they no-op — `applyVariant` filters unknown ids).

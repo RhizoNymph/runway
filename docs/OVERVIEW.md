@@ -91,8 +91,8 @@ Features Index:
     depends_on: [simulation_engine, rent_solver, persistence]
     doc: docs/features/ui.md  # create when touched
   what_if_variants:
-    description: Named expense-tweak scenarios stored in the model, compared side by side against the live baseline (What-if tab), with optional per-scenario max-rent solve and bake-into-plan
-    entry_points: [src/variants.js:applyVariant, src/variants.js:variantMetrics, "src/App.jsx (What-if tab)"]
+    description: Named expense-tweak scenarios stored in the model, compared side by side against the live baseline (What-if tab); an "applied" checkbox overlays a scenario on the plan reversibly (all surfaces go through withApplied), and bake-into-plan makes it permanent
+    entry_points: [src/variants.js:applyVariant, src/variants.js:withApplied, src/variants.js:variantMetrics, "src/App.jsx (What-if tab)"]
     depends_on: [simulation_engine, line_items, rent_solver]
     doc: docs/features/what_if_variants.md
   compare_cli:

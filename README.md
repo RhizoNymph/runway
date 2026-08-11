@@ -63,7 +63,9 @@ writes the same JSON as a download; **Import** reads one back.
 - The **What-if** tab holds named trim scenarios — per-expense "set to"/"± by"
   tweaks — simulated side by side against the live plan: month-one spend,
   the pre-overflow cash trough, end net worth, and (optionally) the max-rent
-  solve for each. "Apply to plan" bakes a scenario into the expense lines.
+  solve for each. Check **applied** to fold a scenario into the plan
+  reversibly (charts, readouts, and solver all include it; uncheck to
+  revert); "Bake into plan" writes it into the expense lines for good.
 - Leftover money each month lands in the account marked "leftover money lands
   here". If it goes negative, that account drains and the shortfall is flagged.
 - An account with a cap sweeps its excess to the overflow destination; a dip

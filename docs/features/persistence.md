@@ -121,8 +121,11 @@ horizon — see docs/features/compare_cli.md. Only copy a variant over
   "scenarios": [                   // the SECOND entry drives headline stats
     { "id": "s", "name": "Base", "rate": 7, "color": "#0E7C86" }
   ],
-  "variants": [                    // what-if scenarios (What-if tab); read-only
-    { "id": "v", "name": "All trims",   //   overlays until "Apply to plan"
+  "variants": [                    // what-if scenarios (What-if tab)
+    { "id": "v", "name": "All trims",
+      "applied": false,            // true: overlays the live plan everywhere
+                                   //   (charts, solver, CLIs) — reversible;
+                                   //   "Bake into plan" makes it permanent
       "startMonth": "",            // slides the scenario: default for tweaks
                                    //   without a month, floor for the rest
                                    //   ("" = each tweak's own month)
