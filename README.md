@@ -30,7 +30,9 @@ writes the same JSON as a download; **Import** reads one back.
 
 - One month per step. Balances compound monthly at `annual rate / 12`.
 - Taxes use 2025 federal and California brackets, the standard deduction, Social
-  Security, Medicare and CA SDI. 401(k) contributions reduce taxable income and
+  Security, Medicare and CA SDI, assessed on each calendar year's actual income
+  (partial first/last years are annualized; months withhold their share in
+  proportion to their gross). 401(k) contributions reduce taxable income and
   stop for the year at the annual limit. Estimates only — no itemizing, credits,
   RSUs or bonus withholding. Check against a paystub and use the flat-rate
   override if it drifts.
@@ -46,13 +48,21 @@ writes the same JSON as a download; **Import** reads one back.
   Linked items follow the rent solver's answer automatically.
 - Scheduled changes adjust a line item from a month onward — "set to" replaces
   the amount, "± by" shifts it by a positive or negative difference. Annual
-  growth compounds yearly on top of whatever amount is in effect.
+  growth compounds on anniversaries of the month the amount was set, so a
+  change bills exactly what you typed and starts growing from its own month.
+  The solver honors the item's schedule too: it solves the "set to" amount at
+  its starting month, deltas stack on top, and "Use this amount" keeps the
+  rest of the schedule.
 - A line item can recur monthly or once per year ("Every: year"): the full
   amount is charged in its chosen calendar month — registration, annual
   premiums, memberships — instead of being averaged across months.
 - The second scenario in the list drives the headline numbers and the solver.
 - Leftover money each month lands in the account marked "leftover money lands
   here". If it goes negative, that account drains and the shortfall is flagged.
+- An account with a cap sweeps its excess to the overflow destination; a dip
+  below zero pulls back just enough to cover it, or — with "refill to cap"
+  checked — all the way back up to the cap, so the cushion self-heals from
+  the linked account.
 
 ## Files
 
@@ -61,5 +71,6 @@ index.html          Vite entry
 src/main.jsx        React mount
 src/engine.js       the model: taxes, line items, month-by-month simulation
 src/engine.test.js  unit tests for the engine
-src/App.jsx         the UI, defaults, solver and persistence
+src/App.jsx         the UI, defaults and persistence
+src/solver.js       the affordability solver (pure, unit-tested)
 ```

@@ -108,8 +108,11 @@ horizon — see docs/features/compare_cli.md. Only copy a variant over
       "capAmount": 30000,          // >0: keep at most this much ...
       "overflowTo": "<account id>",// ... excess moves here monthly (and the
                                    //   backstop pulls back to avoid negatives)
-      "overflowStart": ""          // "YYYY-MM": link dormant before this month
+      "overflowStart": "",         // "YYYY-MM": link dormant before this month
                                    //   (both directions); "" = active always
+      "refillToCap": false         // true: a dip below the cap pulls back up
+                                   //   to it from the overflow destination;
+                                   //   false/missing: pull only to avoid <$0
     }
   ],
   "scenarios": [                   // the SECOND entry drives headline stats

@@ -32,13 +32,16 @@ rest). Edited on the "Accounts & 401(k)" tab.
    exactly `capAmount` behind. Runs in list order with up to
    `accounts.length` passes, so chains (cash → bonds → stocks) cascade
    within the same month; a cycle terminates after the bounded passes.
-5. **Backstop**: an account left **negative** after the overflow pass pulls
-   money back along its overflow chain — from its destination first, then
-   that account's destination, and so on (visited-set stops cycles) — but
-   only enough to reach exactly $0, bounded by each source's positive
-   balance. It never proactively refills to the cap; a balance merely below
-   its cap rebuilds from future leftovers instead of by selling. Cash goes
-   negative only once the entire chain is drained.
+5. **Backstop**: an account left **under its floor** after the overflow
+   pass pulls money back along its overflow chain — from its destination
+   first, then that account's destination, and so on (visited-set stops
+   cycles) — bounded by each source's positive balance. The floor is $0 by
+   default: just enough to avoid going negative, with a balance merely
+   below its cap rebuilding from future leftovers instead of by selling.
+   With `refillToCap: true` the floor **is** the cap: any dip below it
+   pulls back up to `capAmount` the same month ("self-healing" emergency
+   fund), while the chain has money. Cash goes negative only once the
+   entire chain is drained.
 6. **Growth**: every balance compounds at `rate / 12` (fixed rate or the
    scenario rate), after overflow and backstop — money moved this month
    earns its destination's rate this month.
@@ -58,10 +61,13 @@ rest). Edited on the "Accounts & 401(k)" tab.
   models therefore behave exactly as before.
 - Overflow applies to the **whole balance**, not just this month's inflow —
   a starting balance above the cap is swept in month one.
-- The link is asymmetric: excess above the cap always moves on, but money
-  comes back only to prevent a negative balance (to $0, never to the cap).
-  Both directions require the same active link (`capAmount > 0` + valid
-  `overflowTo`), per hop in a chain.
+- The link is asymmetric by default: excess above the cap always moves on,
+  but money comes back only to prevent a negative balance (to $0, never to
+  the cap). `refillToCap: true` (per account; the "refill to cap" checkbox)
+  makes the pull-back symmetric — the backstop targets the cap instead of
+  $0. Missing/false keeps the old behavior. Both directions require the
+  same active link (`capAmount > 0` + valid `overflowTo`), per hop in a
+  chain.
 - `overflowStart` ("YYYY-MM") delays the link: before that month it is
   dormant in **both** directions — no sweep, no backstop — exactly as if
   unconfigured. Empty/invalid means active from the start. Per hop, like

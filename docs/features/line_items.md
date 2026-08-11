@@ -26,8 +26,13 @@ startAbs)` in src/engine.js; editing is `ItemRow`/`ItemList` in src/App.jsx
    missing) replaces the value, `mode: "delta"` adds its amount to the
    value in effect — negative allowed, consecutive deltas stack, a later
    set resets the base.
-5. × `(1 + growth/100) ^ floor(elapsed months / 12)` — growth compounds on
-   simulation-anniversary years, for yearly items too.
+5. × `(1 + growth/100) ^ floor(months since the value was set / 12)` —
+   growth compounds on anniversaries of the month the value in effect was
+   last established: the base amount from the simulation start, a changed
+   value from its change month. A delta applies to the grown value and
+   restarts the anniversary clock; what you type in a change is exactly
+   what the month bills. (A change dated before the sim start accrues
+   growth from its own month, i.e. it may arrive pre-grown.)
 
 ## UI
 
@@ -47,9 +52,10 @@ startAbs)` in src/engine.js; editing is `ItemRow`/`ItemList` in src/App.jsx
 ## Invariants and constraints
 
 - Missing `cadence` means monthly — old saved models are unchanged.
-- Yearly incomes work too (e.g. an annual bonus), but note the tax model
-  annualizes each month's gross ×12, so a spike month is taxed at an
-  inflated marginal rate — same approximation as any income spike here.
+- Yearly incomes work too (e.g. an annual bonus): tax is assessed on the
+  calendar year's actual total (see tax_model), so a spike month no longer
+  inflates its own marginal rate — it just withholds a larger share of the
+  year's bill.
 - A one-time item linked to a yearly expense (`basis: "pct"`) resolves
   against that expense's value in the one-time's month — $0 unless the
   months line up.

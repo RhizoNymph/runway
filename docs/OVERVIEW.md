@@ -20,8 +20,11 @@ Overview:
       external edits by polling; localStorage fallback for static builds;
       debounced autosave and JSON import/export in the main component.
       Schema documented in docs/features/persistence.md.
-    - solver: `runSolver` inside the main component — bisection (42 iters,
-      $0–$40k) over a trial expense amount, rerunning `simulate` per probe.
+    - solver: pure `solveMax`/`trialItem` in src/solver.js — bisection (42
+      iters, $0–$40k) over a trial "set" change at the from-month, keeping
+      the item's other scheduled changes and window in force, rerunning
+      `simulate` per probe. Unit-tested in src/solver.test.js; the panel
+      and "Use this amount" live in src/App.jsx.
     - ui (src/App.jsx): single component `BudgetPlanner` — readout strip,
       allocation bar, two Recharts charts, solver panel, and six tabs of
       editors. Every list row (expenses, incomes, one-times, accounts,
@@ -37,9 +40,9 @@ Overview:
     `simulate` once per scenario → derived chart data / year rollups / stat
     readouts render. Model ↔ localStorage via debounced effect (900ms) on
     every model change; import/export bypasses via file JSON. Solver clones
-    the model with a trial change on the chosen expense and calls `simulate`
-    directly; "Use this amount" writes the solved value back as a scheduled
-    change on the item.
+    the model with a trial "set" change on the chosen expense (the rest of
+    the item's schedule stays live) and calls `simulate` directly; "Use
+    this amount" writes that exact trial item back, rounded down to $25.
 
 Features Index:
   simulation_engine:
@@ -53,10 +56,10 @@ Features Index:
     depends_on: []
     doc: docs/features/line_items.md
   tax_model:
-    description: 2025 federal + CA progressive tax, FICA, flat override
-    entry_points: [src/engine.js:annualTax, src/engine.js:progressive]
+    description: 2025 federal + CA progressive tax assessed per calendar year (partial years annualized), FICA, flat override
+    entry_points: [src/engine.js:annualTax, src/engine.js:progressive, "src/engine.js:simulate (tax pass)"]
     depends_on: []
-    doc: docs/features/tax_model.md  # create when touched
+    doc: docs/features/tax_model.md
   retirement_401k:
     description: 401(k) contribution modes (% of gross, or max-the-limit even split with mid-year starts and prior-YTD) and employer match
     entry_points: [src/engine.js:contribution401k, "src/App.jsx (Accounts & 401(k) tab)"]
@@ -73,10 +76,10 @@ Features Index:
     depends_on: [simulation_engine]
     doc: docs/features/one_time_items.md
   rent_solver:
-    description: Bisection search for max affordable expense under constraints
-    entry_points: [src/App.jsx:runSolver (inside BudgetPlanner)]
+    description: Bisection search for max affordable expense under constraints, honoring the item's schedule
+    entry_points: [src/solver.js:solveMax, src/solver.js:trialItem, "src/App.jsx (solver panel)"]
     depends_on: [simulation_engine]
-    doc: docs/features/rent_solver.md  # create when touched
+    doc: docs/features/rent_solver.md
   persistence:
     description: data/model.json via dev-server API (agent-editable, live-reloading) with localStorage fallback; JSON export/import
     entry_points: [src/App.jsx:store, "vite.config.js:modelStore", src/App.jsx:exportJson, src/App.jsx:importJson]
@@ -105,6 +108,8 @@ Features Index:
 |---|---|
 | `src/engine.js` | Pure model: helpers, tax math, `valueAt`, `contribution401k`, `simulate` |
 | `src/engine.test.js` | Vitest unit tests for the engine (`npm test`) |
+| `src/solver.js` | Pure affordability solver: `trialItem`, `solveMax` |
+| `src/solver.test.js` | Vitest unit tests for the solver |
 | `src/App.jsx` | UI + defaults + solver + persistence (`BudgetPlanner`) |
 | `src/main.jsx` | React 18 mount |
 | `index.html` | Vite entry |
@@ -129,10 +134,12 @@ Features Index:
 - Accounts may set `capAmount` + `overflowTo`: after flows land each month,
   balance above the cap moves to the destination (whole balance, chains
   cascade, cycles are cut off). The same link is a backstop: a negative
-  balance pulls back along the chain just enough to reach $0 — never a
-  proactive refill to the cap. 0/missing cap or invalid destination = link
-  off, both directions; an `overflowStart` month keeps the link dormant
-  (both directions) until it arrives. See docs/features/accounts_flows.md.
+  balance pulls back along the chain just enough to reach $0 — or, with
+  `refillToCap: true` on the account, all the way back up to the cap
+  ("self-healing"; missing/false = old behavior). 0/missing cap or invalid
+  destination = link off, both directions; an `overflowStart` month keeps
+  the link dormant (both directions) until it arrives. See
+  docs/features/accounts_flows.md.
 - 401(k): `settings.mode401k` is `"pct"` (contribute `pct401k`% of gross) or
   `"maxEven"` (contribute `(limit − YTD) / months left in the calendar year`,
   so mid-year starts and lean months still max the limit by December). Both
@@ -144,6 +151,19 @@ Features Index:
   is charged once a year in that calendar month (per-occurrence dollars, not
   averaged). Missing/other cadence = monthly; invalid cadenceMonth = January.
   See docs/features/line_items.md.
+- Growth compounds on anniversaries of the month the value in effect was
+  last established — the base amount from the sim start, a scheduled
+  change's value from its own change month (deltas apply to the grown value
+  and restart the clock). What a change types is what its month bills.
+- Progressive tax is assessed per calendar year on the year's actual
+  simulated totals (partial first/last years annualized ×12/n; the first
+  year's deduction includes `ytd401k`), each month withholding its
+  gross-proportional share. Flat tax stays per-month. See
+  docs/features/tax_model.md.
+- Solver trials replace only a change dated exactly at the from-month; all
+  other scheduled changes and the item's window stay in force, and "Use
+  this amount" writes back the exact trial item (rounded down to $25). See
+  docs/features/rent_solver.md.
 - Any line item or one-time with `disabled: true` is excluded from the
   simulation (`valueAt`/`oneTimeAmount` return 0) without losing its data;
   a linked one-time follows a disabled expense to $0. Missing `disabled`
@@ -156,6 +176,7 @@ Features Index:
 - Saved model shape is merged over `makeDefaults()` on load — but the merge
   is shallow, so `settings` from an old save replaces the defaults object
   wholesale. New settings fields must tolerate being `undefined`.
-- Tests exist only for the engine. No linter, no TypeScript. Plain JSX,
+- Tests cover the engine and the solver (src/*.test.js) plus the CLI
+  script modules. No linter, no TypeScript. Plain JSX,
   React 18. Run with `npm test` (vitest, pinned exact).
 ```
