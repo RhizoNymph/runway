@@ -4,6 +4,7 @@ import {
   Tooltip, Legend, ResponsiveContainer, ReferenceLine,
 } from "recharts";
 import { MON, num, ymToAbs, absToYm, absLabel, valueAt, oneTimeAmount, simulate } from "./engine.js";
+import { solveMax, trialItem } from "./solver.js";
 
 /* ── persistence ──
    Primary store is data/model.json on disk, via the dev server's
@@ -691,63 +692,24 @@ export default function BudgetPlanner() {
 
   function runSolver() {
     if (!solverItem) return;
-    const fromM = solver.fromMonth || absToYm(startAbs);
-    const fromAbs = ymToAbs(fromM) ?? startAbs;
-    const rate = num(baseScenario?.rate ?? 7);
-    const floor = num(solver.cashFloor);
-    const target = num(solver.endTarget);
-
-    const test = (v) => {
-      const kept = (solverItem.changes || []).filter((c) => (ymToAbs(c.month) ?? -Infinity) < fromAbs);
-      const trial = { ...solverItem, endMonth: "", changes: [...kept, { id: "solve", month: fromM, amount: v }] };
-      const r = simulate({ ...model, expenses: expenses.map((e) => (e.id === solverItem.id ? trial : e)) }, rate);
-      const okCash = r.minCash >= floor;
-      const okEnd = !solver.useEndTarget || r.endTotal >= target;
-      return { ok: okCash && okEnd, r, okCash, okEnd };
-    };
-
-    const zero = test(0);
-    if (!zero.ok) {
-      setSolved({ infeasible: true, reason: !zero.okCash ? "cash" : "target", floor, target, fromM });
-      return;
-    }
-    let lo = 0, hi = 40000;
-    const top = test(hi);
-    if (top.ok) {
-      setSolved({
-        value: hi, capped: true, fromM, floor, target, binding: "none in range",
-        current: valueAt(solverItem, Math.max(startAbs, fromAbs), startAbs),
-        minCash: top.r.minCash, endTotal: top.r.endTotal, name: solverItem.name,
-      });
-      return;
-    }
-    for (let i = 0; i < 42; i++) {
-      const mid = (lo + hi) / 2;
-      if (test(mid).ok) lo = mid; else hi = mid;
-    }
-    const final = test(lo);
-    const binding = (() => {
-      const probe = test(lo + 25);
-      if (!probe.okCash) return "cash floor";
-      if (!probe.okEnd) return "savings target";
-      return "cash floor";
-    })();
-    setSolved({
-      value: lo, fromM, floor, target, binding,
-      current: valueAt(solverItem, Math.max(startAbs, ymToAbs(fromM) ?? startAbs), startAbs),
-      minCash: final.r.minCash, endTotal: final.r.endTotal, name: solverItem.name,
-    });
+    setSolved(solveMax(model, {
+      itemId: solverItem.id,
+      fromMonth: solver.fromMonth,
+      cashFloor: solver.cashFloor,
+      endTarget: solver.endTarget,
+      useEndTarget: solver.useEndTarget,
+      rate: num(baseScenario?.rate ?? 7),
+    }));
   }
 
+  /* writes the exact item the solver tested (rounded down to $25), so the
+     applied plan matches the reported minCash / end total */
   function applySolved() {
     if (!solved || solved.infeasible || !solverItem) return;
-    const fromM = solved.fromM;
-    const fromAbs = ymToAbs(fromM) ?? startAbs;
-    const kept = (solverItem.changes || []).filter((c) => (ymToAbs(c.month) ?? -Infinity) < fromAbs);
-    const rounded = Math.floor(solved.value / 25) * 25;
+    const t = trialItem(solverItem, solved.fromM, Math.floor(solved.value / 25) * 25);
     patch({
       expenses: expenses.map((e) => e.id === solverItem.id
-        ? { ...e, changes: [...kept, { id: uid(), month: fromM, amount: rounded }] } : e),
+        ? { ...t, changes: t.changes.map((c) => (c.id === "solve" ? { ...c, id: uid() } : c)) } : e),
     });
   }
 
@@ -965,6 +927,8 @@ export default function BudgetPlanner() {
                     ? `${money(solved.value - solved.current)} more than you have budgeted`
                     : `${money(solved.current - solved.value)} less than you have budgeted`}</>}.
                 Binding constraint: {solved.binding}. Cash bottoms out at {money(solved.minCash)}; you end with {money(solved.endTotal)}.
+                The line's own schedule stays in force: "&#177; by" changes stack on top of this amount, a later
+                "set to" replaces it, and the start/end window still applies.
               </div>
             </>
           )}
