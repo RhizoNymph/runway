@@ -5,6 +5,7 @@ import {
 } from "recharts";
 import { MON, num, ymToAbs, absToYm, absLabel, valueAt, oneTimeAmount, simulate } from "./engine.js";
 import { solveMax, trialItem } from "./solver.js";
+import { applyVariant, variantMetrics } from "./variants.js";
 
 /* ── persistence ──
    Primary store is data/model.json on disk, via the dev server's
@@ -132,6 +133,7 @@ function makeDefaults() {
       { id: uid(), name: "Bull", rate: 10, color: "#D9611A" },
     ],
     solver: { itemId: null, fromMonth: "", cashFloor: 15000, endTarget: 0, useEndTarget: false },
+    variants: [],
   };
 }
 
@@ -583,6 +585,7 @@ export default function BudgetPlanner() {
   const [loaded, setLoaded] = useState(false);
   const [saveNote, setSaveNote] = useState("");
   const [solved, setSolved] = useState(null);
+  const [showMaxRent, setShowMaxRent] = useState(false);
   const fileRef = useRef(null);
   const lastSaved = useRef(""); // exact text last read from / written to the store
 
@@ -721,6 +724,39 @@ export default function BudgetPlanner() {
         ? { ...t, changes: t.changes.map((c) => (c.id === "solve" ? { ...c, id: uid() } : c)) } : e),
     });
   }
+
+  /* ── what-if variants: overlays compared against the live baseline ── */
+  const variantsList = model.variants || [];
+  const setVariants = (v) => patch({ variants: v });
+  const setTweak = (v, t, p) => setVariants(variantsList.map((x) => x.id === v.id
+    ? { ...x, tweaks: (x.tweaks || []).map((y) => (y.id === t.id ? { ...y, ...p } : y)) } : x));
+
+  const whatif = useMemo(() => {
+    if (tab !== "whatif") return null;
+    const rate = num(baseScenario?.rate ?? 7);
+    const rows = [
+      { id: "baseline", name: "Baseline (current plan)", varied: model },
+      ...variantsList.map((v) => ({ id: v.id, name: v.name || "(unnamed)", varied: applyVariant(model, v) })),
+    ];
+    return rows.map((row) => {
+      const met = variantMetrics(row.varied, rate);
+      let maxRent = null;
+      if (showMaxRent && solverItem) {
+        const s = solveMax(row.varied, {
+          itemId: solverItem.id, fromMonth: solver.fromMonth, cashFloor: solver.cashFloor,
+          endTarget: solver.endTarget, useEndTarget: solver.useEndTarget, rate,
+        });
+        maxRent = s && !s.infeasible ? Math.floor(s.value / 25) * 25 : NaN;
+      }
+      return { ...row, ...met, maxRent };
+    });
+  }, [tab, model, showMaxRent]);
+
+  const applyVariantToPlan = (v) => {
+    if (!confirm(`Bake "${v.name || "this scenario"}" into the expense lines and remove it from the list?`)) return;
+    const baked = applyVariant(model, v);
+    patch({ expenses: baked.expenses, variants: variantsList.filter((x) => x.id !== v.id) });
+  };
 
   /* import / export */
   function exportJson() {
@@ -946,7 +982,8 @@ export default function BudgetPlanner() {
         {/* TABS */}
         <div className="bp-tabs">
           {[["expenses", "Expenses"], ["income", "Income"], ["onetime", "One-time"],
-            ["accounts", "Accounts & 401(k)"], ["settings", "Taxes & scenarios"], ["table", "Year by year"]]
+            ["accounts", "Accounts & 401(k)"], ["whatif", "What-if"],
+            ["settings", "Taxes & scenarios"], ["table", "Year by year"]]
             .map(([k, l]) => (
               <button key={k} className="bp-tab" data-on={tab === k ? "1" : "0"} onClick={() => setTab(k)}>{l}</button>
             ))}
@@ -1190,6 +1227,111 @@ export default function BudgetPlanner() {
               The link also works as a backstop: a month that would drive the account negative pulls money back from
               the overflow account (and on down the chain) just enough to reach $0. Dips below the cap are otherwise
               rebuilt from future leftovers, not by selling.
+            </div>
+          </div>
+        )}
+
+        {tab === "whatif" && (
+          <div className="bp-card" style={{ marginTop: 0, borderTop: "none" }}>
+            <div className="bp-eyebrow">What-if scenarios — side by side against the current plan</div>
+            {whatif && whatif.length > 1 ? (
+              <div className="bp-tblwrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Scenario</th><th>Spend, month 1</th><th>Trough cash</th><th>&#916; trough</th>
+                      <th>End net worth</th><th>&#916; end</th>
+                      {showMaxRent && <><th>Max {solverItem?.name || "rent"}</th><th>&#916;</th></>}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {whatif.map((row, i) => {
+                      const b = whatif[0];
+                      const d = (v, bv) => (i === 0 ? "—" : `${v - bv >= 0 ? "+" : "−"}${money(Math.abs(v - bv))}`);
+                      return (
+                        <tr key={row.id}>
+                          <td>{row.name}</td>
+                          <td>{money(row.firstExp)}</td>
+                          <td>{money(row.trough)} <span className="bp-hint">{absLabel(row.troughAbs)}</span></td>
+                          <td>{d(row.trough, b.trough)}</td>
+                          <td>{money(row.endTotal)}</td>
+                          <td>{d(row.endTotal, b.endTotal)}</td>
+                          {showMaxRent && <>
+                            <td>{Number.isNaN(row.maxRent) ? "infeasible" : money(row.maxRent)}</td>
+                            <td>{i === 0 || Number.isNaN(row.maxRent) || Number.isNaN(b.maxRent) ? "—" : d(row.maxRent, b.maxRent)}</td>
+                          </>}
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="bp-note">No scenarios yet — add one below and it will be simulated against the plan.</div>
+            )}
+            <label className="bp-hint" style={{ display: "flex", gap: 6, alignItems: "center", marginTop: 10 }}>
+              <input type="checkbox" checked={showMaxRent} onChange={(e) => setShowMaxRent(e.target.checked)} />
+              include a max-{(solverItem?.name || "rent").toLowerCase()} column (runs the solver per scenario,
+              with the solver panel's floor and starting month)
+            </label>
+            <div className="bp-note">
+              Scenarios are overlays on the live plan — edit any expense or income and every row recomputes;
+              nothing here changes the plan until you hit "Apply". Trough cash is the lowest point before the
+              first overflow link starts (the drawdown bottom that cap-skimming later hides); end net worth uses
+              the {baseScenario?.name || "headline"} scenario. A "&#177; by" tweak lasts until the line's next
+              "set to" change, like any delta.
+            </div>
+
+            {variantsList.map((v) => (
+              <div key={v.id} style={{ marginTop: 14, paddingTop: 10, borderTop: "1px solid var(--rule)" }}>
+                <div className="bp-flex">
+                  <span style={{ flex: "1 1 220px" }}>
+                    <TextInput value={v.name} placeholder="Scenario name"
+                      onChange={(nm) => setVariants(variantsList.map((x) => (x.id === v.id ? { ...x, name: nm } : x)))} />
+                  </span>
+                  <button className="bp-btn" onClick={() => applyVariantToPlan(v)}
+                    title="Write these tweaks into the expense lines as scheduled changes and drop the scenario">
+                    Apply to plan
+                  </button>
+                  <button className="bp-x" title="Remove scenario"
+                    onClick={() => setVariants(variantsList.filter((x) => x.id !== v.id))}>&#10005;</button>
+                </div>
+                {(v.tweaks || []).map((t) => (
+                  <div key={t.id} className="bp-flex" style={{ marginTop: 6, paddingLeft: 12 }}>
+                    <select value={t.itemId || ""} onChange={(e) => setTweak(v, t, { itemId: e.target.value })}>
+                      <option value="">— expense —</option>
+                      {expenses.map((e2) => <option key={e2.id} value={e2.id}>{e2.name || "(unnamed)"}</option>)}
+                    </select>
+                    <select value={t.mode === "delta" ? "delta" : "set"}
+                      onChange={(e) => setTweak(v, t, { mode: e.target.value })}>
+                      <option value="set">set to</option>
+                      <option value="delta">&#177; by</option>
+                    </select>
+                    <span style={{ width: 110 }}>
+                      <NumInput value={t.amount} step={10} onChange={(nv) => setTweak(v, t, { amount: nv })} />
+                    </span>
+                    <span style={{ width: 128 }} title="Empty = from the first simulated month">
+                      <MonthInput value={t.startMonth || ""} onChange={(nv) => setTweak(v, t, { startMonth: nv })} />
+                    </span>
+                    <button className="bp-x" title="Remove tweak"
+                      onClick={() => setVariants(variantsList.map((x) => x.id === v.id
+                        ? { ...x, tweaks: (x.tweaks || []).filter((y) => y.id !== t.id) } : x))}>&#10005;</button>
+                  </div>
+                ))}
+                <div style={{ paddingLeft: 12, marginTop: 6 }}>
+                  <button className="bp-btn ghost" onClick={() => setVariants(variantsList.map((x) => x.id === v.id
+                    ? { ...x, tweaks: [...(x.tweaks || []), { id: uid(), itemId: expenses[0]?.id || "", mode: "set", amount: 0, startMonth: "" }] }
+                    : x))}>
+                    + Add a tweak
+                  </button>
+                </div>
+              </div>
+            ))}
+            <div style={{ marginTop: 12 }}>
+              <button className="bp-btn"
+                onClick={() => setVariants([...variantsList, { id: uid(), name: "", tweaks: [] }])}>
+                + Add a scenario
+              </button>
             </div>
           </div>
         )}

@@ -60,6 +60,10 @@ writes the same JSON as a download; **Import** reads one back.
   amount is charged in its chosen calendar month — registration, annual
   premiums, memberships — instead of being averaged across months.
 - The second scenario in the list drives the headline numbers and the solver.
+- The **What-if** tab holds named trim scenarios — per-expense "set to"/"± by"
+  tweaks — simulated side by side against the live plan: month-one spend,
+  the pre-overflow cash trough, end net worth, and (optionally) the max-rent
+  solve for each. "Apply to plan" bakes a scenario into the expense lines.
 - Leftover money each month lands in the account marked "leftover money lands
   here". If it goes negative, that account drains and the shortfall is flagged.
 - An account with a cap sweeps its excess to the overflow destination; a dip
@@ -76,4 +80,5 @@ src/engine.js       the model: taxes, line items, month-by-month simulation
 src/engine.test.js  unit tests for the engine
 src/App.jsx         the UI, defaults and persistence
 src/solver.js       the affordability solver (pure, unit-tested)
+src/variants.js     what-if scenario overlays + metrics (pure, unit-tested)
 ```

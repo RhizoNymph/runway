@@ -121,6 +121,14 @@ horizon — see docs/features/compare_cli.md. Only copy a variant over
   "scenarios": [                   // the SECOND entry drives headline stats
     { "id": "s", "name": "Base", "rate": 7, "color": "#0E7C86" }
   ],
+  "variants": [                    // what-if scenarios (What-if tab); read-only
+    { "id": "v", "name": "All trims",   //   overlays until "Apply to plan"
+      "tweaks": [ { "id": "t", "itemId": "<expense id>",
+                    "mode": "set",   // "set" (default) | "delta"
+                    "amount": 400,
+                    "startMonth": "" // "" = from the sim's first month
+      } ] }
+  ],
   "solver": { "itemId": null, "fromMonth": "", "cashFloor": 15000,
               "endTarget": 0, "useEndTarget": false }
 }

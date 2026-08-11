@@ -90,6 +90,11 @@ Features Index:
     entry_points: [src/App.jsx:BudgetPlanner, src/main.jsx]
     depends_on: [simulation_engine, rent_solver, persistence]
     doc: docs/features/ui.md  # create when touched
+  what_if_variants:
+    description: Named expense-tweak scenarios stored in the model, compared side by side against the live baseline (What-if tab), with optional per-scenario max-rent solve and bake-into-plan
+    entry_points: [src/variants.js:applyVariant, src/variants.js:variantMetrics, "src/App.jsx (What-if tab)"]
+    depends_on: [simulation_engine, line_items, rent_solver]
+    doc: docs/features/what_if_variants.md
   compare_cli:
     description: CLI diffing a variant model against data/model.json — impact at milestone/checkpoint months, lowest cash, end net worth
     entry_points: [scripts/compare.js, scripts/compare/core.js]
@@ -110,6 +115,8 @@ Features Index:
 | `src/engine.test.js` | Vitest unit tests for the engine (`npm test`) |
 | `src/solver.js` | Pure affordability solver: `trialItem`, `solveMax` |
 | `src/solver.test.js` | Vitest unit tests for the solver |
+| `src/variants.js` | Pure what-if overlays: `applyVariant`, `variantMetrics` |
+| `src/variants.test.js` | Vitest unit tests for the what-if overlays |
 | `src/App.jsx` | UI + defaults + solver + persistence (`BudgetPlanner`) |
 | `src/main.jsx` | React 18 mount |
 | `index.html` | Vite entry |
