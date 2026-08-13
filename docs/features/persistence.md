@@ -129,10 +129,14 @@ horizon — see docs/features/compare_cli.md. Only copy a variant over
       "startMonth": "",            // slides the scenario: default for tweaks
                                    //   without a month, floor for the rest
                                    //   ("" = each tweak's own month)
-      "tweaks": [ { "id": "t", "itemId": "<expense id>",
+      "tweaks": [ { "id": "t",
+                    "kind": "expense", // expense (default) | income | onetime
+                    "itemId": "<item id>",
                     "mode": "set",   // "set" (default) | "delta"
                     "amount": 400,
-                    "startMonth": "" // "" = variant/sim start
+                    "startMonth": "" // "" = variant/sim start; ignored for
+                                     //   one-times (no schedule — the tweak
+                                     //   changes their amount directly)
       } ] }
   ],
   "sensitivity": {                 // Sensitivity tab axis config (results are

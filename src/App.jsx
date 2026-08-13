@@ -1400,9 +1400,21 @@ export default function BudgetPlanner() {
                 </div>
                 {(v.tweaks || []).map((t) => (
                   <div key={t.id} className="bp-flex" style={{ marginTop: 6, paddingLeft: 12 }}>
-                    <select value={t.itemId || ""} onChange={(e) => setTweak(v, t, { itemId: e.target.value })}>
-                      <option value="">— expense —</option>
-                      {expenses.map((e2) => <option key={e2.id} value={e2.id}>{e2.name || "(unnamed)"}</option>)}
+                    <select value={`${t.kind || "expense"}:${t.itemId || ""}`}
+                      onChange={(e) => {
+                        const [kind, itemId] = e.target.value.split(":");
+                        setTweak(v, t, { kind, itemId });
+                      }}>
+                      <option value="expense:">— item —</option>
+                      <optgroup label="Expenses">
+                        {expenses.map((e2) => <option key={e2.id} value={`expense:${e2.id}`}>{e2.name || "(unnamed)"}</option>)}
+                      </optgroup>
+                      <optgroup label="Income">
+                        {incomes.map((e2) => <option key={e2.id} value={`income:${e2.id}`}>{e2.name || "(unnamed)"}</option>)}
+                      </optgroup>
+                      <optgroup label="One-time">
+                        {oneTimes.map((e2) => <option key={e2.id} value={`onetime:${e2.id}`}>{e2.name || "(unnamed)"}</option>)}
+                      </optgroup>
                     </select>
                     <select value={t.mode === "delta" ? "delta" : "set"}
                       onChange={(e) => setTweak(v, t, { mode: e.target.value })}>
@@ -1412,9 +1424,11 @@ export default function BudgetPlanner() {
                     <span style={{ width: 110 }}>
                       <NumInput value={t.amount} step={10} onChange={(nv) => setTweak(v, t, { amount: nv })} />
                     </span>
-                    <span style={{ width: 128 }} title="Empty = from the first simulated month">
-                      <MonthInput value={t.startMonth || ""} onChange={(nv) => setTweak(v, t, { startMonth: nv })} />
-                    </span>
+                    {t.kind !== "onetime" && (
+                      <span style={{ width: 128 }} title="Empty = from the first simulated month">
+                        <MonthInput value={t.startMonth || ""} onChange={(nv) => setTweak(v, t, { startMonth: nv })} />
+                      </span>
+                    )}
                     <button className="bp-x" title="Remove tweak"
                       onClick={() => setVariants(variantsList.map((x) => x.id === v.id
                         ? { ...x, tweaks: (x.tweaks || []).filter((y) => y.id !== t.id) } : x))}>&#10005;</button>

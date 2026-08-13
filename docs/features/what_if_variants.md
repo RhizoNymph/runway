@@ -19,14 +19,18 @@ plan" live in `BudgetPlanner` (src/App.jsx).
 ## Data / control flow
 
 1. `model.variants[]` — each `{ id, name, startMonth, tweaks: [{ id,
-   itemId, mode, amount, startMonth }] }`. A tweak targets one expense
-   line: from its `startMonth` (empty/invalid = the variant's, else the
-   sim's start month) it either sets the amount (`mode: "set"`, default)
-   or shifts it (`mode: "delta"`). The variant-level `startMonth` slides
-   the whole scenario at once ("what if I did all this in three months?"):
-   it defaults tweaks without their own month and floors the rest — a
-   tweak dated earlier is pushed to it, one dated later keeps its later
-   date, so post-move constraints survive the slide.
+   kind, itemId, mode, amount, startMonth }] }`. A tweak targets one line
+   item — `kind` is `"expense"` (default when missing, so old saves are
+   unchanged), `"income"`, or `"onetime"` — and from its `startMonth`
+   (empty/invalid = the variant's, else the sim's start month) it either
+   sets the amount (`mode: "set"`, default) or shifts it (`mode:
+   "delta"`). One-time items have no schedule: their tweaks replace or
+   shift the amount directly and ignore months. The variant-level
+   `startMonth` slides the whole scenario at once ("what if I did all
+   this in three months?"): it defaults tweaks without their own month
+   and floors the rest — a tweak dated earlier is pushed to it, one dated
+   later keeps its later date, so post-move constraints survive the
+   slide.
 2. `applyVariant(model, variant)` returns a new model whose tweaked
    expenses carry injected scheduled changes, appended after the item's own
    changes — so a same-month set tweak wins, deltas stack, and a later

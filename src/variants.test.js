@@ -86,6 +86,31 @@ describe("applyVariant", () => {
     expect(valueAt(v.expenses[1], ymToAbs("2026-08"), start)).toBe(100);
     expect(valueAt(v.expenses[1], ymToAbs("2026-09"), start)).toBe(50);
   });
+  it("an income tweak injects a scheduled change on the income line", () => {
+    const m = model([expense("food", 885)]);
+    const v = applyVariant(m, {
+      id: "v1",
+      tweaks: [{ id: "t1", kind: "income", itemId: "i1", mode: "set", amount: 1250, startMonth: "2026-04" }],
+    });
+    expect(valueAt(v.incomes[0], start, start)).toBe(10000);
+    expect(valueAt(v.incomes[0], ymToAbs("2026-04"), start)).toBe(1250);
+    expect(m.incomes[0].changes).toHaveLength(0);
+  });
+  it("a one-time tweak replaces or shifts its amount directly (no schedule)", () => {
+    const m = model([expense("food", 885)], {
+      oneTimes: [{ id: "o1", name: "Relocation", month: "2026-03", amount: 50000, kind: "in" }],
+    });
+    const set = applyVariant(m, { id: "v1", tweaks: [{ id: "t1", kind: "onetime", itemId: "o1", mode: "set", amount: 30000, startMonth: "" }] });
+    expect(set.oneTimes[0].amount).toBe(30000);
+    const delta = applyVariant(m, { id: "v2", tweaks: [{ id: "t1", kind: "onetime", itemId: "o1", mode: "delta", amount: -20000, startMonth: "" }] });
+    expect(delta.oneTimes[0].amount).toBe(30000);
+    expect(m.oneTimes[0].amount).toBe(50000);
+  });
+  it("a tweak without a kind targets expenses, as before", () => {
+    const m = model([expense("food", 885)]);
+    const v = applyVariant(m, { id: "v1", tweaks: [{ id: "t1", itemId: "food", mode: "set", amount: 400, startMonth: "" }] });
+    expect(valueAt(v.expenses[0], start, start)).toBe(400);
+  });
   it("does not mutate the input model and ignores unknown items", () => {
     const m = model([expense("food", 885)]);
     const before = JSON.stringify(m);

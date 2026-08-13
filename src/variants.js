@@ -5,27 +5,39 @@
 
 import { simulate, ymToAbs, absToYm, num } from "./engine.js";
 
-/* A tweak targets one expense line: from `startMonth` (empty/invalid = the
-   variant's own start month, else the sim's) it either sets the amount or
-   shifts it by a delta. A variant-level `startMonth` slides the whole
-   scenario at once: it is the default for tweaks without a month of their
-   own, and a floor for the rest — a tweak dated earlier is pushed to it, a
-   tweak dated later keeps its later date (a post-move constraint survives
-   the slide). Each lands as an injected scheduled change appended after
-   the item's own changes, so a same-month "set" tweak wins and a delta
-   stacks — the same composition rules `valueAt` applies to everything
-   else. */
+/* A tweak targets one line item — `kind`: "expense" (default, so old saved
+   variants are unchanged), "income", or "onetime". From `startMonth`
+   (empty/invalid = the variant's own start month, else the sim's) it either
+   sets the amount or shifts it by a delta. A variant-level `startMonth`
+   slides the whole scenario at once: it is the default for tweaks without a
+   month of their own, and a floor for the rest — a tweak dated earlier is
+   pushed to it, a tweak dated later keeps its later date (a post-move
+   constraint survives the slide). Income/expense tweaks land as injected
+   scheduled changes appended after the item's own changes, so a same-month
+   "set" tweak wins and a delta stacks — the same composition rules
+   `valueAt` applies to everything else. One-time items have no schedule, so
+   their tweaks replace or shift the amount directly and ignore months. */
+const KIND_KEYS = { income: "incomes", expense: "expenses", onetime: "oneTimes" };
+const tweakKind = (t) => (KIND_KEYS[t.kind] ? t.kind : "expense");
+
 export function applyVariant(model, variant) {
   const tweaks = (variant?.tweaks || []).filter((t) => t.itemId);
   if (!tweaks.length) return model;
   const startAbs = ymToAbs(model.settings.startMonth) ?? new Date().getFullYear() * 12;
   const varStart = ymToAbs(variant.startMonth);
-  return {
-    ...model,
-    expenses: model.expenses.map((e) => {
-      const mine = tweaks.filter((t) => t.itemId === e.id);
-      if (!mine.length) return e;
-      const injected = mine.map((t, i) => {
+  const out = { ...model };
+  for (const [kind, key] of Object.entries(KIND_KEYS)) {
+    const mine = tweaks.filter((t) => tweakKind(t) === kind);
+    if (!mine.length) continue;
+    out[key] = out[key].map((item) => {
+      const forItem = mine.filter((t) => t.itemId === item.id);
+      if (!forItem.length) return item;
+      if (kind === "onetime") {
+        let amount = num(item.amount);
+        for (const t of forItem) amount = t.mode === "delta" ? amount + num(t.amount) : num(t.amount);
+        return { ...item, amount };
+      }
+      const injected = forItem.map((t, i) => {
         const own = ymToAbs(t.startMonth) ?? startAbs;
         const eff = varStart !== null ? Math.max(own, varStart) : own;
         return {
@@ -35,9 +47,10 @@ export function applyVariant(model, variant) {
           mode: t.mode === "delta" ? "delta" : "set",
         };
       });
-      return { ...e, changes: [...(e.changes || []), ...injected] };
-    }),
-  };
+      return { ...item, changes: [...(item.changes || []), ...injected] };
+    });
+  }
+  return out;
 }
 
 /* The model as the app actually simulates it: every variant whose
