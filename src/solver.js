@@ -15,6 +15,23 @@ export function trialItem(item, fromMonth, amount) {
   return { ...item, changes: [...kept, { id: "solve", month: fromMonth, amount, mode: "set" }] };
 }
 
+/* What "Use this amount" writes back. A solve dated at (or before) the
+   sim's first month belongs in the item's base amount — a start-dated
+   scheduled change would shadow the Amount field forever — so it bakes in
+   and clears any change dated at or before the start. A solve from a
+   genuinely future month stays a scheduled "set" change (the trial's
+   shape), leaving earlier months on the item's own schedule. Either way
+   the simulated values match what the solver tested. */
+export function solvedItem(item, fromMonth, amount, settingsStartMonth) {
+  const startAbs = ymToAbs(settingsStartMonth) ?? new Date().getFullYear() * 12;
+  const fromAbs = ymToAbs(fromMonth) ?? startAbs;
+  if (fromAbs <= startAbs) {
+    const kept = (item.changes || []).filter((c) => (ymToAbs(c.month) ?? -Infinity) > startAbs);
+    return { ...item, amount, changes: kept };
+  }
+  return trialItem(item, fromMonth, amount);
+}
+
 /* Finds the largest amount for the item (from fromMonth onward, subject to
    its remaining schedule) that keeps every month's cash at or above the
    floor — and, optionally, the ending net worth at or above a target.

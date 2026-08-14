@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { trialItem, solveMax } from "./solver.js";
+import { trialItem, solvedItem, solveMax } from "./solver.js";
 import { ymToAbs } from "./engine.js";
 
 /* flat 0% tax, no 401(k), one cash account: net = gross, so affordability
@@ -54,6 +54,33 @@ describe("trialItem", () => {
   it("leaves the item's window untouched", () => {
     const t = trialItem(rentItem({ endMonth: "2026-06" }), "2026-01", 3000);
     expect(t.endMonth).toBe("2026-06");
+  });
+});
+
+describe("solvedItem — what 'Use this amount' writes back", () => {
+  it("a solve from the sim start lands in the base amount, not a shadowing change", () => {
+    const item = rentItem({
+      amount: 7500,
+      changes: [
+        { id: "old", month: "2026-01", amount: 8375, mode: "set" }, // stale write-back
+        { id: "later", month: "2026-07", amount: -500, mode: "delta" },
+      ],
+    });
+    const t = solvedItem(item, "2026-01", 6000, "2026-01");
+    expect(t.amount).toBe(6000);
+    expect(t.changes.map((c) => c.id)).toEqual(["later"]); // start-dated change gone, future kept
+  });
+  it("a solve from a future month stays a scheduled change with the base intact", () => {
+    const item = rentItem({ amount: 2000 });
+    const t = solvedItem(item, "2026-06", 3000, "2026-01");
+    expect(t.amount).toBe(2000);
+    expect(t.changes.find((c) => c.id === "solve")).toMatchObject({ month: "2026-06", amount: 3000, mode: "set" });
+  });
+  it("a solve dated before the sim start also bakes into the base", () => {
+    const item = rentItem({ amount: 2000, changes: [{ id: "pre", month: "2025-06", amount: 9999, mode: "set" }] });
+    const t = solvedItem(item, "2025-12", 1500, "2026-01");
+    expect(t.amount).toBe(1500);
+    expect(t.changes).toEqual([]); // pre-start maskers cleared
   });
 });
 

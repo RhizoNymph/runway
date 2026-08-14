@@ -4,7 +4,7 @@ import {
   Tooltip, Legend, ResponsiveContainer, ReferenceLine,
 } from "recharts";
 import { MON, num, ymToAbs, absToYm, absLabel, valueAt, oneTimeAmount, simulate } from "./engine.js";
-import { solveMax, trialItem } from "./solver.js";
+import { solveMax, solvedItem } from "./solver.js";
 import { applyVariant, variantMetrics, withApplied } from "./variants.js";
 import { runSensitivity, METRICS } from "./sensitivity.js";
 
@@ -723,11 +723,12 @@ export default function BudgetPlanner() {
     }));
   }
 
-  /* writes the exact item the solver tested (rounded down to $25), so the
-     applied plan matches the reported minCash / end total */
+  /* writes the exact plan the solver tested (rounded down to $25): into the
+     base amount when solving from the sim start, as a scheduled change only
+     for a future from-month — so the Amount field never gets shadowed */
   function applySolved() {
     if (!solved || solved.infeasible || !solverItem) return;
-    const t = trialItem(solverItem, solved.fromM, Math.floor(solved.value / 25) * 25);
+    const t = solvedItem(solverItem, solved.fromM, Math.floor(solved.value / 25) * 25, settings.startMonth);
     patch({
       expenses: expenses.map((e) => e.id === solverItem.id
         ? { ...t, changes: t.changes.map((c) => (c.id === "solve" ? { ...c, id: uid() } : c)) } : e),

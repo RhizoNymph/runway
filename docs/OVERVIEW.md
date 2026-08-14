@@ -179,9 +179,11 @@ Features Index:
   gross-proportional share. Flat tax stays per-month. See
   docs/features/tax_model.md.
 - Solver trials replace only a change dated exactly at the from-month; all
-  other scheduled changes and the item's window stay in force, and "Use
-  this amount" writes back the exact trial item (rounded down to $25). See
-  docs/features/rent_solver.md.
+  other scheduled changes and the item's window stay in force. "Use this
+  amount" writes the solved value (rounded down to $25) into the **base
+  amount** when solving from the sim start — never a start-dated change,
+  which would shadow the Amount field — and as a scheduled change only for
+  a future from-month. See docs/features/rent_solver.md.
 - Any line item or one-time with `disabled: true` is excluded from the
   simulation (`valueAt`/`oneTimeAmount` return 0) without losing its data;
   a linked one-time follows a disabled expense to $0. Missing `disabled`

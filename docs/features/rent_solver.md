@@ -33,10 +33,13 @@ optionally the ending net worth at or above a target. Pure search logic in
    [0, 40000] converge on the boundary, and a `+$25` probe labels the
    binding constraint ("cash floor" / "savings target").
 4. The result feeds the gauge + summary note. **Use this amount** writes
-   `trialItem(item, fromM, floor25(value))` back into the model (the solve
-   change gets a fresh uid) — the applied item is exactly the tested one,
-   rounded down to $25, so the plan you keep matches the reported
-   minCash/endTotal (rounding down errs feasible).
+   `solvedItem(item, fromM, floor25(value), startMonth)` back into the
+   model: a solve dated at/before the sim start bakes into the item's
+   **base amount** (clearing changes dated ≤ start — a start-dated change
+   would shadow the Amount field forever); a future from-month becomes a
+   scheduled "set" change (fresh uid), leaving earlier months on the
+   item's own schedule. Either way the applied plan simulates exactly as
+   tested, rounded down to $25 (rounding down errs feasible).
 
 ## Related files
 
