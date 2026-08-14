@@ -5,7 +5,7 @@
    as swept do". Pure — the Sensitivity tab in src/App.jsx renders the
    charts. */
 
-import { num } from "./engine.js";
+import { num, ymToAbs, absToYm } from "./engine.js";
 import { solveMax } from "./solver.js";
 import { variantMetrics } from "./variants.js";
 
@@ -30,13 +30,26 @@ export function axisValues(axis) {
 
 const KEYS = { income: "incomes", expense: "expenses", onetime: "oneTimes" };
 
-/* Replaces the item's base amount (scheduled changes still fold on top —
-   the sweep asks "what if this line's amount were X"). A pct-linked
-   one-time ignores its amount, so sweeping one is a visible no-op. */
+/* Pins the swept value with a "set" change at the sim's start month —
+   replacing any change dated exactly there (a solver write-back would
+   otherwise mask the whole sweep) — while the item's later schedule still
+   folds on top. One-times have no schedule, so their amount is replaced
+   directly. A pct-linked one-time ignores its amount, so sweeping one is
+   a visible no-op. */
 export function setItemAmount(model, axis, value) {
   const key = KEYS[axis.kind];
   if (!key || !axis.itemId) return model;
-  return { ...model, [key]: model[key].map((x) => (x.id === axis.itemId ? { ...x, amount: value } : x)) };
+  const startAbs = ymToAbs(model.settings.startMonth) ?? new Date().getFullYear() * 12;
+  const startM = absToYm(startAbs);
+  return {
+    ...model,
+    [key]: model[key].map((x) => {
+      if (x.id !== axis.itemId) return x;
+      if (axis.kind === "onetime") return { ...x, amount: value };
+      const kept = (x.changes || []).filter((c) => ymToAbs(c.month) !== startAbs);
+      return { ...x, changes: [...kept, { id: "sweep", month: startM, amount: num(value), mode: "set" }] };
+    }),
+  };
 }
 
 /* Grid run, b outer × a inner; cells[j * aValues.length + i] pairs with

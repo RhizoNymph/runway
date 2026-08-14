@@ -26,9 +26,12 @@ pick when the swept item *is* the rent). Pure grid logic in
    `outputs` two `METRICS` keys (default `["maxRent", "endAtMax"]`).
    Picking an item defaults the range to 0…2× its current amount.
 2. `runSensitivity(model, { a, b, solve, rate, metrics })` sweeps the
-   grid (`b` outer × `a` inner). Each cell replaces the items' **base
-   amounts** via `setItemAmount` (scheduled changes still fold on top),
-   then computes only what the chosen metrics need: `needs: "solve"`
+   grid (`b` outer × `a` inner). Each cell pins the swept value via
+   `setItemAmount` — a "set" change at the sim's start month that replaces
+   any change dated exactly there (a solver write-back would otherwise
+   mask the sweep), with the item's later schedule still folding on top;
+   one-times get their amount replaced directly — then computes only what
+   the chosen metrics need: `needs: "solve"`
    metrics run `solveMax` with the solver panel's settings (`maxRent`,
    `endAtMax` — NaN where even $0 is infeasible); `needs: "sim"` metrics
    share one `variantMetrics` simulation of the swept plan (`endPlan`,

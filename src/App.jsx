@@ -1521,7 +1521,8 @@ export default function BudgetPlanner() {
               max" is where you land if you actually pay the solved amount, and gaps mean even $0 fails.
               Simulation outputs run the plan as swept instead — pick those when the swept item <em>is</em>{" "}
               the rent. Everything uses the {baseScenario?.name || "headline"} rate with applied what-ifs
-              included; the sweep replaces the item's base amount, and scheduled changes still fold on top.
+              included; the sweep pins the item's value from the first month (overriding a change dated
+              there, like a solver write-back), and its later schedule still folds on top.
             </div>
 
             {sensCharts && <>

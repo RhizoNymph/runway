@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { axisValues, setItemAmount, runSensitivity } from "./sensitivity.js";
+import { valueAt, ymToAbs } from "./engine.js";
 
 /* flat 0% tax, no 401(k), one cash account, no growth: net = income, so
    max rent and end totals are simple arithmetic over the grid */
@@ -34,17 +35,32 @@ describe("axisValues", () => {
 });
 
 describe("setItemAmount", () => {
-  it("replaces the amount for each kind without mutating", () => {
+  const start = ymToAbs("2026-01");
+  it("pins the swept value for each kind without mutating", () => {
     const m = model();
     const inc = setItemAmount(m, { kind: "income", itemId: "sal" }, 7);
     const exp = setItemAmount(m, { kind: "expense", itemId: "other" }, 8);
     const one = setItemAmount(m, { kind: "onetime", itemId: "bonus" }, 9);
-    expect(inc.incomes[0].amount).toBe(7);
-    expect(exp.expenses[1].amount).toBe(8);
+    expect(valueAt(inc.incomes[0], start, start)).toBe(7);
+    expect(valueAt(exp.expenses[1], start, start)).toBe(8);
     expect(one.oneTimes[0].amount).toBe(9);
-    expect(m.incomes[0].amount).toBe(10000);
-    expect(m.expenses[1].amount).toBe(0);
+    expect(valueAt(m.incomes[0], start, start)).toBe(10000);
+    expect(valueAt(m.expenses[1], start, start)).toBe(0);
     expect(m.oneTimes[0].amount).toBe(0);
+  });
+  it("beats a same-start-month set change (e.g. a solver write-back)", () => {
+    const m = model();
+    m.expenses[0].changes = [{ id: "solved", month: "2026-01", amount: 8375, mode: "set" }];
+    const swept = setItemAmount(m, { kind: "expense", itemId: "rent" }, 5000);
+    expect(valueAt(swept.expenses[0], start, start)).toBe(5000);
+    expect(valueAt(swept.expenses[0], start + 11, start)).toBe(5000);
+  });
+  it("keeps the item's later schedule folding on top", () => {
+    const m = model();
+    m.expenses[0].changes = [{ id: "d", month: "2026-07", amount: -1000, mode: "delta" }];
+    const swept = setItemAmount(m, { kind: "expense", itemId: "rent" }, 5000);
+    expect(valueAt(swept.expenses[0], ymToAbs("2026-06"), start)).toBe(5000);
+    expect(valueAt(swept.expenses[0], ymToAbs("2026-07"), start)).toBe(4000);
   });
 });
 
