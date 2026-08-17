@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
-  LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid,
+  LineChart, Line, AreaChart, Area, BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid,
   Tooltip, Legend, ResponsiveContainer, ReferenceLine,
 } from "recharts";
 import { MON, num, ymToAbs, absToYm, absLabel, valueAt, oneTimeAmount, simulate } from "./engine.js";
@@ -182,6 +182,10 @@ const CSS = `
 .bp-readout { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:1px;
   background:var(--rule); border:1px solid var(--rule); margin-top:16px; }
 .bp-stat { background:var(--panel); padding:10px 12px; }
+.bp-minirow { display:grid; grid-template-columns:repeat(3, 1fr); gap:10px; margin-top:10px; }
+.bp-mini { background:var(--panel); padding:8px 10px 2px; }
+.bp-mini .recharts-wrapper { cursor:pointer; }
+@media (max-width: 900px) { .bp-minirow { grid-template-columns:1fr; } }
 .bp-stat .k { font-family:var(--mono); font-size:10px; letter-spacing:0.1em; text-transform:uppercase; color:var(--muted); }
 .bp-stat .v { font-family:var(--mono); font-size:19px; font-variant-numeric:tabular-nums; letter-spacing:-0.02em; margin-top:2px; }
 .bp-stat .n { font-size:11px; color:var(--muted); }
@@ -952,6 +956,47 @@ export default function BudgetPlanner() {
             <div className="v">{moneyK(base.endTotal)}</div>
             <div className="n">{baseScenario?.name} · {baseScenario?.rate}%/yr</div>
           </div>
+        </div>
+
+        {/* the same three monthly figures across the whole horizon —
+            click any bar to pin the readout to that month */}
+        <div className="bp-minirow">
+          {[
+            { key: "net", title: "Take-home / mo", color: "#0E7C86" },
+            { key: "exp", title: "Living costs / mo", color: "#1B2430" },
+            { key: "surplus", title: "Left over / mo", color: "#D9611A", signColored: true },
+          ].map(({ key, title, color, signColored }) => (
+            <div key={key} className="bp-mini">
+              <div className="k" style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted)" }}>
+                {title} over time
+              </div>
+              <div style={{ width: "100%", height: 88 }}>
+                <ResponsiveContainer>
+                  <BarChart data={base.rows} margin={{ top: 6, right: 2, bottom: 0, left: 2 }} barCategoryGap="12%"
+                    onClick={(st) => {
+                      const p = st && st.activePayload && st.activePayload[0];
+                      if (p) setSettings({ readoutMonth: absToYm(p.payload.abs) });
+                    }}>
+                    <XAxis dataKey="label" hide />
+                    <YAxis hide domain={signColored ? ["auto", "auto"] : [0, "auto"]} />
+                    {signColored && <ReferenceLine y={0} stroke="#C7CDBF" />}
+                    <Tooltip contentStyle={tooltipStyle} formatter={(v) => money(v)} isAnimationActive={false} />
+                    <Bar dataKey={key} isAnimationActive={false} radius={[2, 2, 0, 0]}>
+                      {base.rows.map((r, i) => (
+                        <Cell key={r.abs}
+                          fill={signColored && r[key] < 0 ? "#B3261E" : color}
+                          fillOpacity={i === readoutIdx ? 1 : 0.4}
+                          stroke={i === readoutIdx ? "#1B2430" : "none"} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="bp-note" style={{ marginTop: 4 }}>
+          Click any bar to pin the readout above to that month — steps mark trims, scheduled changes, moves, and raises.
         </div>
 
         {base.firstNegative !== null && (
