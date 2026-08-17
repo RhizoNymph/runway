@@ -83,6 +83,7 @@ function makeDefaults() {
       useFlatTax: false,
       flatTaxRate: 33,
       inflation: 3,
+      readoutMonth: "",
       milestones: [],
       mode401k: "pct",
       pct401k: 10,
@@ -684,7 +685,13 @@ export default function BudgetPlanner() {
 
   const baseScenario = scenarios[Math.min(1, scenarios.length - 1)] || scenarios[0];
   const base = sims[baseScenario?.id] || simulate(model, 7);
-  const m0 = base.rows[0] || {};
+  /* the month the readout strip, allocation bar, and savings rate show —
+     settings.readoutMonth, clamped into the horizon; empty = first month */
+  const readoutIdx = Math.min(
+    Math.max(0, (ymToAbs(settings.readoutMonth) ?? startAbs) - startAbs),
+    Math.max(0, base.rows.length - 1),
+  );
+  const m0 = base.rows[readoutIdx] || {};
 
   const netWorthData = base.rows.map((r, i) => {
     const o = { label: r.label };
@@ -906,6 +913,14 @@ export default function BudgetPlanner() {
         </div>
 
         {/* readout */}
+        <div className="bp-flex" style={{ margin: "10px 0 6px", justifyContent: "flex-end" }}>
+          <span className="bp-hint">monthly readout as of</span>
+          <span style={{ width: 128 }}
+            title="Empty = the first simulated month. Pick a later month to see the numbers once trims and scheduled changes have kicked in.">
+            <MonthInput value={settings.readoutMonth || ""} onChange={(v) => setSettings({ readoutMonth: v })} />
+          </span>
+          {m0.label && <span className="bp-hint" style={{ fontFamily: "var(--mono)" }}>→ {m0.label}</span>}
+        </div>
         <div className="bp-readout">
           <div className="bp-stat">
             <div className="k">Take-home / mo</div>

@@ -59,6 +59,9 @@ horizon — see docs/features/compare_cli.md. Only copy a variant over
     "useFlatTax": false,           // true → flat flatTaxRate% instead of brackets
     "flatTaxRate": 33,
     "inflation": 3,                // %/yr; "apply to all" button default
+    "readoutMonth": "",            // "YYYY-MM" the readout strip/allocation
+                                   //   bar shows; ""/missing = first month
+                                   //   (clamped into the horizon)
     "milestones": ["2027-07"],     // optional YYYY-MM planning dates; the
                                    //   compare CLI uses them as default
                                    //   checkpoints (engine ignores them)

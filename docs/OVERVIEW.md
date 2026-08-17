@@ -25,8 +25,10 @@ Overview:
       the item's other scheduled changes and window in force, rerunning
       `simulate` per probe. Unit-tested in src/solver.test.js; the panel
       and "Use this amount" live in src/App.jsx.
-    - ui (src/App.jsx): single component `BudgetPlanner` — readout strip,
-      allocation bar, two Recharts charts, solver panel, tabs of editors,
+    - ui (src/App.jsx): single component `BudgetPlanner` — readout strip
+      and allocation bar pinned to a selectable month
+      (`settings.readoutMonth`, empty = first month), two Recharts charts,
+      solver panel, tabs of editors,
       and a sticky plan-in-effect sidebar (`.bp-side`, wide viewports)
       listing applied what-ifs (uncheck to remove) and skipped lines (tick
       to include) so ambient state is always visible. Every list row (expenses, incomes, one-times, accounts,
