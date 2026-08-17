@@ -155,13 +155,15 @@ const CSS = `
 .bp-wrap { max-width: 1120px; margin: 0 auto; }
 .bp-layout { display:flex; gap:22px; justify-content:center; align-items:flex-start; }
 .bp-layout > .bp-wrap { margin:0; min-width:0; flex:0 1 1120px; }
-.bp-side { flex:0 0 240px; position:sticky; top:14px; background:var(--panel);
-  border:1px solid var(--rule); padding:12px 14px 14px; font-size:12.5px; }
+.bp-side-col { flex:0 0 240px; align-self:stretch; }
+.bp-side { position:sticky; top:0; height:100vh; display:flex; flex-direction:column; justify-content:center; }
+.bp-side-in { background:var(--panel); border:1px solid var(--rule); padding:12px 14px 14px;
+  font-size:12.5px; max-height:calc(100vh - 28px); overflow:auto; }
 .bp-side-h { font-family:var(--mono); font-size:10.5px; text-transform:uppercase; letter-spacing:0.07em;
   color:var(--muted); margin:12px 0 4px; }
 .bp-side-row { display:flex; gap:7px; align-items:flex-start; margin:5px 0; cursor:pointer; line-height:1.35; }
 .bp-side-row input { margin-top:2px; }
-@media (max-width: 1420px) { .bp-side { display:none; } }
+@media (max-width: 1420px) { .bp-side-col { display:none; } }
 
 .bp-mast { display:flex; align-items:baseline; justify-content:space-between; gap:16px; flex-wrap:wrap;
   border-bottom:2px solid var(--ink); padding-bottom:10px; margin-bottom:4px; }
@@ -1688,8 +1690,11 @@ export default function BudgetPlanner() {
         </div>
       </div>
 
-      {/* plan-in-effect sidebar: the ambient assumptions, always visible */}
+      {/* plan-in-effect sidebar: the ambient assumptions, always visible,
+          vertically centered in the viewport while the page scrolls */}
+      <div className="bp-side-col">
       <aside className="bp-side">
+      <div className="bp-side-in">
         <div className="bp-eyebrow" style={{ margin: 0 }}>Plan in effect</div>
         <div className="bp-side-h">Applied what-ifs</div>
         {variantsList.filter((v) => v.applied).length === 0 && (
@@ -1725,7 +1730,9 @@ export default function BudgetPlanner() {
         <div className="bp-hint" style={{ marginTop: 12, borderTop: "1px solid var(--rule2)", paddingTop: 8 }}>
           Everything shown anywhere in the app reflects this state.
         </div>
+      </div>
       </aside>
+      </div>
       </div>
     </div>
   );
