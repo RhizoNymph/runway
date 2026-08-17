@@ -26,8 +26,10 @@ Overview:
       `simulate` per probe. Unit-tested in src/solver.test.js; the panel
       and "Use this amount" live in src/App.jsx.
     - ui (src/App.jsx): single component `BudgetPlanner` — readout strip,
-      allocation bar, two Recharts charts, solver panel, and six tabs of
-      editors. Every list row (expenses, incomes, one-times, accounts,
+      allocation bar, two Recharts charts, solver panel, tabs of editors,
+      and a sticky plan-in-effect sidebar (`.bp-side`, wide viewports)
+      listing applied what-ifs (uncheck to remove) and skipped lines (tick
+      to include) so ambient state is always visible. Every list row (expenses, incomes, one-times, accounts,
       scenarios) is drag-to-reorder via a ⋮⋮ handle (`useDragReorder`,
       native HTML5 drag events — no library; no touch support). Month
       fields are a custom `MonthInput` popover picker (year stepper +

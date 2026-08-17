@@ -59,6 +59,14 @@ describe("What-if applied checkbox", () => {
     await act(async () => { await new Promise((r) => setTimeout(r, 1200)); });
     expect(appliedBox().checked).toBe(true);
 
+    // the sidebar mirrors the applied overlay and can turn it off from anywhere
+    const side = div.querySelector(".bp-side");
+    const sideRow = [...side.querySelectorAll(".bp-side-row")].find((l) => l.querySelector("input").checked);
+    expect(sideRow).toBeTruthy();
+    await act(async () => { sideRow.querySelector("input").click(); });
+    expect(appliedBox().checked).toBe(false);
+    expect(button("What-if").textContent).not.toContain("(1 on)");
+
     // every save must byte-match what the middleware stores
     for (const body of putBodies) expect(body.endsWith("\n")).toBe(true);
   }, 30000);

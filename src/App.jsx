@@ -153,6 +153,15 @@ const CSS = `
   min-height:100vh; padding: 20px 16px 80px; font-size:14px; line-height:1.45;
 }
 .bp-wrap { max-width: 1120px; margin: 0 auto; }
+.bp-layout { display:flex; gap:22px; justify-content:center; align-items:flex-start; }
+.bp-layout > .bp-wrap { margin:0; min-width:0; flex:0 1 1120px; }
+.bp-side { flex:0 0 240px; position:sticky; top:14px; background:var(--panel);
+  border:1px solid var(--rule); padding:12px 14px 14px; font-size:12.5px; }
+.bp-side-h { font-family:var(--mono); font-size:10.5px; text-transform:uppercase; letter-spacing:0.07em;
+  color:var(--muted); margin:12px 0 4px; }
+.bp-side-row { display:flex; gap:7px; align-items:flex-start; margin:5px 0; cursor:pointer; line-height:1.35; }
+.bp-side-row input { margin-top:2px; }
+@media (max-width: 1420px) { .bp-side { display:none; } }
 
 .bp-mast { display:flex; align-items:baseline; justify-content:space-between; gap:16px; flex-wrap:wrap;
   border-bottom:2px solid var(--ink); padding-bottom:10px; margin-bottom:4px; }
@@ -878,6 +887,7 @@ export default function BudgetPlanner() {
   return (
     <div className="bp">
       <style>{CSS}</style>
+      <div className="bp-layout">
       <div className="bp-wrap">
 
         <div className="bp-mast">
@@ -1676,6 +1686,46 @@ export default function BudgetPlanner() {
           Everything here is an estimate for planning, not tax or investment advice. Your work saves in this browser
           automatically — use Export to keep a copy you can move somewhere else.
         </div>
+      </div>
+
+      {/* plan-in-effect sidebar: the ambient assumptions, always visible */}
+      <aside className="bp-side">
+        <div className="bp-eyebrow" style={{ margin: 0 }}>Plan in effect</div>
+        <div className="bp-side-h">Applied what-ifs</div>
+        {variantsList.filter((v) => v.applied).length === 0 && (
+          <div className="bp-hint">None — charts, readouts, and the solver show the raw plan.</div>
+        )}
+        {variantsList.filter((v) => v.applied).map((v) => (
+          <label key={v.id} className="bp-side-row" title="Uncheck to remove this overlay from the plan everywhere">
+            <input type="checkbox" checked
+              onChange={() => setVariants(variantsList.map((x) => (x.id === v.id ? { ...x, applied: false } : x)))} />
+            <span>{v.name || "(unnamed)"}</span>
+          </label>
+        ))}
+        {incomes.some((i) => i.disabled) && <>
+          <div className="bp-side-h">Skipped income — tick to include</div>
+          {incomes.filter((i) => i.disabled).map((i) => (
+            <label key={i.id} className="bp-side-row" title="Currently excluded from the plan">
+              <input type="checkbox" checked={false}
+                onChange={() => patch({ incomes: incomes.map((x) => (x.id === i.id ? { ...x, disabled: false } : x)) })} />
+              <span>{i.name || "(unnamed)"}</span>
+            </label>
+          ))}
+        </>}
+        {expenses.some((e) => e.disabled) && <>
+          <div className="bp-side-h">Skipped expenses — tick to include</div>
+          {expenses.filter((e) => e.disabled).map((e2) => (
+            <label key={e2.id} className="bp-side-row" title="Currently excluded from the plan">
+              <input type="checkbox" checked={false}
+                onChange={() => patch({ expenses: expenses.map((x) => (x.id === e2.id ? { ...x, disabled: false } : x)) })} />
+              <span>{e2.name || "(unnamed)"}</span>
+            </label>
+          ))}
+        </>}
+        <div className="bp-hint" style={{ marginTop: 12, borderTop: "1px solid var(--rule2)", paddingTop: 8 }}>
+          Everything shown anywhere in the app reflects this state.
+        </div>
+      </aside>
       </div>
     </div>
   );

@@ -50,7 +50,9 @@ plan" live in `BudgetPlanner` (src/App.jsx).
    lines stay untouched; unchecking reverts. In the table, the baseline row
    includes every applied scenario; an applied scenario's own row shows the
    plan *without* it, so all deltas read as "what toggling this checkbox
-   does". The tab label counts applied scenarios.
+   does". The tab label counts applied scenarios, and the plan-in-effect
+   sidebar (every tab, wide viewports) lists them with uncheck-to-remove
+   toggles alongside skipped income/expense lines.
 6. **Bake into plan** permanently writes a scenario's injected changes into
    the real expense lines (via `applyVariant`) and removes the scenario
    from the list, preventing double-application.
