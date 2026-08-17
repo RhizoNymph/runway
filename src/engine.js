@@ -164,8 +164,13 @@ export function simulate(model, annualReturnPct) {
       if (i.afterTax) postTax += v; else gross += v;
     }
 
-    // pre-tax retirement contribution
-    const c401 = contribution401k(settings, gross, ytd401k, abs % 12);
+    // pre-tax retirement contribution. `settings.start401k` (YYYY-MM,
+    // empty/missing = from the beginning) keeps contributions and match at
+    // zero until it arrives — e.g. skipping a late-year catch-up and starting
+    // fresh the next January.
+    const start401 = ymToAbs(settings.start401k);
+    const active401 = start401 === null || abs >= start401;
+    const c401 = active401 ? contribution401k(settings, gross, ytd401k, abs % 12) : 0;
     ytd401k += c401;
 
     // employer match: in pct mode the nominal election is matched; in maxEven
@@ -174,7 +179,7 @@ export function simulate(model, annualReturnPct) {
       ? (gross > 0 ? (c401 / gross) * 100 : 0)
       : num(settings.pct401k);
     const matchedPct = Math.min(electedPct, num(settings.matchCapPct));
-    const match = gross * (matchedPct / 100) * (num(settings.matchPct) / 100);
+    const match = active401 ? gross * (matchedPct / 100) * (num(settings.matchPct) / 100) : 0;
 
     months.push({ abs, year, gross, postTax, c401, match, tax: 0 });
   }

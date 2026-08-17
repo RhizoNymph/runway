@@ -86,6 +86,7 @@ function makeDefaults() {
       readoutMonth: "",
       milestones: [],
       mode401k: "pct",
+      start401k: "",
       pct401k: 10,
       limit401k: 23500,
       ytd401k: 0,
@@ -1282,6 +1283,10 @@ export default function BudgetPlanner() {
                     <input value={money(m0.c401 || 0)} readOnly style={{ color: "#6E7A72" }} /></Field>
                 : <Field label="You contribute (% of gross)">
                     <NumInput value={settings.pct401k} step={1} onChange={(v) => setSettings({ pct401k: v })} /></Field>}
+              <Field label="Contributions start">
+                <span title="Empty = from the first simulated month. Set a later month to defer — e.g. skip a late-year catch-up and start fresh in January. No contributions or match accrue before it.">
+                  <MonthInput value={settings.start401k || ""} onChange={(v) => setSettings({ start401k: v })} />
+                </span></Field>
               <Field label="Annual limit">
                 <NumInput value={settings.limit401k} step={500} onChange={(v) => setSettings({ limit401k: v })} /></Field>
               <Field label="Already contributed this year">
