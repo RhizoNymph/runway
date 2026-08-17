@@ -1020,6 +1020,16 @@ export default function BudgetPlanner() {
               </div>
             </Field>
           </div>
+          {(variantsList.some((v) => v.applied) || incomes.some((i) => i.disabled) || expenses.some((e) => e.disabled)) && (
+            <div className="bp-note" style={{ marginTop: 10, borderLeft: "3px solid var(--pen4)", paddingLeft: 8 }}>
+              Solving the plan as currently in effect
+              {variantsList.some((v) => v.applied) && <> — applied what-ifs: <strong>
+                {variantsList.filter((v) => v.applied).map((v) => v.name).join("; ")}</strong> (their scheduled
+                changes stay in force, so the answer can be a short-window number)</>}
+              {incomes.some((i) => i.disabled) && <>. Skipped income: {incomes.filter((i) => i.disabled).map((i) => i.name).join(", ")}</>}
+              {expenses.some((e) => e.disabled) && <>. Skipped expenses: {expenses.filter((e) => e.disabled).map((e) => e.name).join(", ")}</>}.
+            </div>
+          )}
           <div className="bp-flex" style={{ marginTop: 12 }}>
             <button className="bp-btn solid" onClick={runSolver}>Find the maximum</button>
             {solved && !solved.infeasible &&
