@@ -9,8 +9,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "compare": "node scripts/compare.js",
-    "trims:report": "node scripts/trim-report.js"
+    "compare": "node scripts/compare.js"
   },
   "dependencies": {
     "react": "^18.3.1",

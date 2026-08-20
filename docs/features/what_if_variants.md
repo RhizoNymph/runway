@@ -12,9 +12,9 @@ plan" live in `BudgetPlanner` (src/App.jsx).
 
 - Return-rate scenarios (the `scenarios` array) — those vary markets, not
   spending.
-- The offline `scripts/trim-report.js` / `data/variants/*.json` flow — that
-  predates this feature and snapshots models to files; this tab is the
-  live-model replacement for day-to-day comparison.
+- The offline variant-file flow (`data/variants/*.json` + the compare CLI)
+  — that snapshots models to files; this tab is the live-model way to
+  compare day to day.
 
 ## Data / control flow
 

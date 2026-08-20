@@ -129,7 +129,6 @@ Features Index:
 | `src/main.jsx` | React 18 mount |
 | `index.html` | Vite entry |
 | `vite.config.js` | Port 5180, relative base for static hosting |
-| `scripts/trim-report.js` | Regenerates `data/variants/TRIMS.md` + trim variant files from `data/model.json` (`npm run trims:report`) |
 
 ## Invariants and constraints
 
