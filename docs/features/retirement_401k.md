@@ -60,12 +60,6 @@ start doesn't re-contribute money that went in before `startMonth`.
 
 ## Invariants and constraints
 
-- `settings.start401k` ("YYYY-MM"; ""/missing = from the sim start) zeroes
-  both the contribution and the employer match for months before it — used
-  to defer enrollment (e.g. skip a late-year catch-up and start fresh in
-  January). From that month, `maxEven` splits the remaining limit over the
-  months left in that calendar year as usual, and the calendar-year tax
-  pass sees the smaller deduction automatically.
 - `mode401k` values other than `"maxEven"` (including `undefined` from old
   saved/imported models — the load merge is shallow) behave as `"pct"`;
   a missing `ytd401k` behaves as 0.

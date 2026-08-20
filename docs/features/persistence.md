@@ -66,8 +66,6 @@ horizon — see docs/features/compare_cli.md. Only copy a variant over
                                    //   compare CLI uses them as default
                                    //   checkpoints (engine ignores them)
     "mode401k": "pct",             // "pct" | "maxEven" (spread limit over the year)
-    "start401k": "",               // "YYYY-MM": no contributions or match before
-                                   //   this month; ""/missing = from the start
     "pct401k": 10,                 //  % of gross, pct mode
     "limit401k": 23500,            // annual cap
     "ytd401k": 0,                  // already contributed this calendar year

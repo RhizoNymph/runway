@@ -181,19 +181,6 @@ describe("simulate — 401(k) even split", () => {
     expect(r.rows[5].label).toMatch(/^Jan/);
     expect(r.rows.slice(5).reduce((t, m) => t + m.c401, 0)).toBeCloseTo(24000); // full limit again
   });
-  it("start401k defers contributions, then maxEven splits over the months left", () => {
-    const r = simulate(model({ mode401k: "maxEven", start401k: "2026-05" }), 0);
-    r.rows.slice(0, 4).forEach((m) => expect(m.c401).toBe(0)); // Jan–Apr idle
-    r.rows.slice(4).forEach((m) => expect(m.c401).toBeCloseTo(3000)); // 24000 / 8
-    expect(r.rows.reduce((t, m) => t + m.c401, 0)).toBeCloseTo(24000);
-  });
-  it("no match accrues before start401k, in pct mode either", () => {
-    const r = simulate(model({ pct401k: 10, matchPct: 50, matchCapPct: 6, start401k: "2026-03" }), 0);
-    expect(r.rows[0].c401).toBe(0);
-    expect(r.rows[0].match).toBe(0);
-    expect(r.rows[2].c401).toBeCloseTo(1000);
-    expect(r.rows[2].match).toBeCloseTo(10000 * 0.06 * 0.5);
-  });
   it("bases the employer match on the effective contribution percentage", () => {
     // gross 10000, c401 2000 → 20% effective, capped at 6%, matched at 50%
     const r = simulate(model({ mode401k: "maxEven", matchPct: 50, matchCapPct: 6 }), 0);
