@@ -4,6 +4,9 @@ A monthly budget and savings simulator. Model income, expenses, one-time costs,
 401(k) contributions and investment accounts across return scenarios — and solve
 for the highest rent that still keeps you above a cash floor.
 
+Everything runs in your browser. There is no backend, no account, and no
+telemetry — your numbers never leave your machine.
+
 ## Running it
 
 ```
@@ -12,19 +15,43 @@ npm run dev
 ```
 Opens on http://localhost:5180. `npm run build` emits a static `dist/` you can
 host anywhere or open directly (the config uses relative asset paths).
-`npm test` runs the engine's unit tests.
+`npm test` runs the unit tests.
 
 ## Where your data lives
 
-Running under `npm run dev` (or `npm run preview`), the model autosaves to
-**`data/model.json`** — a pretty-printed, gitignored JSON file. Edit it with
-any tool (or point an agent at it; the schema is documented in
-`docs/features/persistence.md`) and the open app picks the change up within
-a few seconds. The first run migrates whatever the browser had saved.
+On a static host (or opening `dist/` directly), the model autosaves to
+`localStorage` under `budget-model-v1`, scoped to the origin you open it
+from — so it stays in that browser, on that device. **Export** writes the
+model as a JSON download (your backup, and the way to move between
+devices); **Import** reads one back. Clearing the browser's site data
+deletes the model, so export once you've entered real numbers.
 
-As a static build with no server, the app falls back to `localStorage`
-under `budget-model-v1`, scoped to the origin you open it from. **Export**
-writes the same JSON as a download; **Import** reads one back.
+Running locally under `npm run dev` (or `npm run preview`), the model
+autosaves to **`data/model.json`** instead — a pretty-printed, gitignored
+JSON file. Edit it with any tool (or point an agent at it; the schema is
+documented in `docs/features/persistence.md`) and the open app picks the
+change up within a few seconds. The first run migrates whatever the
+browser had saved.
+
+## Hosting it (Cloudflare Pages)
+
+The build is fully static, so any static host works. On Cloudflare Pages:
+
+1. Dashboard → **Workers & Pages → Create → Pages → Connect to Git**, pick
+   this repo.
+2. Framework preset **Vite** (or set it manually): build command
+   `npm run build`, build output directory `dist`. No environment variables.
+3. Deploy. Every push to the production branch redeploys.
+
+Or from the CLI without connecting the repo:
+
+```
+npm run build
+npx wrangler pages deploy dist
+```
+
+Each visitor gets their own private model in their own browser's
+localStorage; the deployment serves only the app itself.
 
 ## Notes on the model
 
@@ -88,4 +115,11 @@ src/engine.test.js  unit tests for the engine
 src/App.jsx         the UI, defaults and persistence
 src/solver.js       the affordability solver (pure, unit-tested)
 src/variants.js     what-if scenario overlays + metrics (pure, unit-tested)
+src/sensitivity.js  sensitivity sweeps over item-amount grids (pure, unit-tested)
+scripts/compare.js  CLI: diff a variant model file against data/model.json
+docs/               codebase overview + per-feature docs (incl. the model JSON schema)
 ```
+
+Taxes are US-specific (2025 federal brackets + California, with a custom
+flat state rate and a flat-tax override for everyone else). Everything is
+estimates — sanity-check against a real paystub.
