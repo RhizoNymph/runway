@@ -2,3 +2,8 @@ node_modules
 dist
 .DS_Store
 data/
+
+# personal statement-analysis tooling — lives locally, not part of the app
+scripts/analyze-statements.js
+scripts/statements/
+docs/features/statement_analysis.md

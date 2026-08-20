@@ -9,7 +9,6 @@
     "build": "vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "analyze:statements": "node scripts/analyze-statements.js",
     "compare": "node scripts/compare.js",
     "trims:report": "node scripts/trim-report.js"
   },

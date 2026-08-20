@@ -111,11 +111,6 @@ Features Index:
     entry_points: [scripts/compare.js, scripts/compare/core.js]
     depends_on: [simulation_engine, persistence]
     doc: docs/features/compare_cli.md
-  statement_analysis:
-    description: CLI that parses data/bank-statements PDFs (the bank) into a categorized ledger, budget report, and suggested simulator expense lines
-    entry_points: [scripts/analyze-statements.js, scripts/statements/parser.js]
-    depends_on: []
-    doc: docs/features/statement_analysis.md
 ```
 
 ## Key files
@@ -134,8 +129,6 @@ Features Index:
 | `src/main.jsx` | React 18 mount |
 | `index.html` | Vite entry |
 | `vite.config.js` | Port 5180, relative base for static hosting |
-| `scripts/analyze-statements.js` | CLI: bank-statement PDFs → `data/analysis/` ledger + report (`npm run analyze:statements`) |
-| `scripts/statements/*.js` | Pure statement parser / categorizer / aggregator / report modules + tests |
 | `scripts/trim-report.js` | Regenerates `data/variants/TRIMS.md` + trim variant files from `data/model.json` (`npm run trims:report`) |
 
 ## Invariants and constraints
